@@ -21,9 +21,13 @@ function shortenPath(path: string, cwd: string, home: string): string {
 
 const WIDE_CHAR = /[ᄀ-ᅟ㐀-꓏가-힣豈-﫿︰-﹏＀-￯]/
 
-/** Display width of one character — CJK glyphs render two terminal columns wide. */
+// tool icons render two columns wide, like CJK glyphs. The ornament arrows
+// we use (▸ ❯ ●) are NOT Extended_Pictographic, so they stay one column.
+const EMOJI = /\p{Extended_Pictographic}/u
+
+/** Display width of one character — CJK glyphs and emoji render two terminal columns wide. */
 function charWidth(ch: string): number {
-  return WIDE_CHAR.test(ch) ? 2 : 1
+  return WIDE_CHAR.test(ch) || EMOJI.test(ch) ? 2 : 1
 }
 
 function displayWidth(text: string): number {

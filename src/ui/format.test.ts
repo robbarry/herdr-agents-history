@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDetail, formatTime, wrapText } from './format.js'
+import { formatDetail, formatTime, padDisplay, wrapText } from './format.js'
 
 const HOME = '/Users/ray'
 const CWD = '/Users/ray/dev/my-app'
@@ -60,5 +60,30 @@ describe('wrapText', () => {
 
   it('never produces empty output for non-empty input', () => {
     expect(wrapText('x', 10).length).toBeGreaterThan(0)
+  })
+})
+
+describe('padDisplay', () => {
+  it('pads ASCII text to the target column width', () => {
+    expect(padDisplay('abc', 6)).toBe('abc   ')
+  })
+
+  it('counts CJK characters as two columns when padding', () => {
+    // '가나' is 4 columns wide → 2 spaces to reach 6
+    expect(padDisplay('가나', 6)).toBe('가나  ')
+  })
+
+  it('counts emoji as two columns so a highlighted row lines up', () => {
+    // '💻' is 2 columns wide → 4 spaces to reach 6
+    expect(padDisplay('💻', 6)).toBe('💻    ')
+  })
+
+  it('leaves the arrow ornaments as single-width', () => {
+    // ▸ and ❯ are not emoji → 1 column each
+    expect(padDisplay('▸❯', 5)).toBe('▸❯   ')
+  })
+
+  it('does not pad when already at or over width', () => {
+    expect(padDisplay('abcdef', 3)).toBe('abcdef')
   })
 })

@@ -2,8 +2,12 @@ import { Box, Text } from 'ink'
 import type { FeedGroup } from '../collapse.js'
 import type { AgentSnapshot } from '../types.js'
 import { agentColor, toolStyle } from '../theme.js'
-import { formatDetail, formatTime } from './format.js'
+import { formatDetail, formatTime, padDisplay } from './format.js'
 import { Scrollbar } from './Scrollbar.js'
+
+// focused row: solid highlight with a high-contrast complementary text color
+const FOCUS_BG = 'cyanBright'
+const FOCUS_FG = 'black'
 
 interface Props {
   readonly groups: FeedGroup[]
@@ -33,10 +37,14 @@ export function Feed({ groups, bottomIndex, focusIndex, agents, height, width, p
   }
 
   const focused = focusIndex !== null
-  const listHeight = focused ? Math.max(height - 1, 1) : height
+  const newerCount = groups.length - 1 - bottomIndex
+  // the "N more below" hint only appears when there is actually more below; at
+  // the newest row (newerCount === 0) it vanishes and the list reclaims its row
+  const showIndicator = focused && newerCount > 0
+  const listHeight = showIndicator ? Math.max(height - 1, 1) : height
   const start = Math.max(bottomIndex - listHeight + 1, 0)
   const rows = groups.slice(start, bottomIndex + 1)
-  const newerCount = groups.length - 1 - bottomIndex
+  const contentWidth = Math.max(width - 4, 10)
 
   return (
     <Box flexDirection="column" paddingX={1} height={height} overflow="hidden" justifyContent="flex-end">
@@ -44,15 +52,36 @@ export function Feed({ groups, bottomIndex, focusIndex, agents, height, width, p
         <Box flexDirection="column" flexGrow={1} flexShrink={1}>
           {rows.map(({ event, count }, rowIndex) => {
             const isFocused = focusIndex !== null && start + rowIndex === focusIndex
-            const gutter = isFocused ? <Text color="cyan">▸ </Text> : <Text>{'  '}</Text>
+            const label = event.agentLabel.slice(0, LABEL_WIDTH - 2)
+            const working = workingKeys.has(event.agentKey)
+
+            // focused row: assemble one string (emoji counted as 2 cols) and
+            // pad to the full width so the highlight fills the whole line
+            if (isFocused) {
+              const time = formatTime(event.ts, now)
+              const line =
+                event.kind === 'turn'
+                  ? `▸ ${time}  ❯ ${label}  “${event.detail}”`
+                  : `▸ ${time}  ${padDisplay(label, LABEL_WIDTH - 2)}` +
+                    `${working && pulse ? '● ' : '  '}${toolStyle(event.tool).icon} ` +
+                    `${event.tool.slice(0, TOOL_WIDTH).padEnd(TOOL_WIDTH)} ` +
+                    `${formatDetail(event.detail, cwdByKey.get(event.agentKey) ?? '', detailWidth)}` +
+                    `${count > 1 ? ` ×${count}` : ''}`
+              return (
+                <Box key={event.id}>
+                  <Text backgroundColor={FOCUS_BG} color={FOCUS_FG} bold wrap="truncate">
+                    {padDisplay(line, contentWidth)}
+                  </Text>
+                </Box>
+              )
+            }
+
             if (event.kind === 'turn') {
               return (
                 <Text key={event.id} wrap="truncate">
-                  {gutter}
+                  {'  '}
                   <Text dimColor>{formatTime(event.ts, now)}  </Text>
-                  <Text color={agentColor(event.agentKey)} bold={isFocused}>
-                    ❯ {event.agentLabel.slice(0, LABEL_WIDTH - 2)}
-                  </Text>
+                  <Text color={agentColor(event.agentKey)}>❯ {label}</Text>
                   <Text dimColor>
                     {' '}
                     “{event.detail}” {'─'.repeat(width)}
@@ -61,13 +90,11 @@ export function Feed({ groups, bottomIndex, focusIndex, agents, height, width, p
               )
             }
             const style = toolStyle(event.tool)
-            const working = workingKeys.has(event.agentKey)
-            const label = event.agentLabel.slice(0, LABEL_WIDTH - 2)
             return (
               <Box key={event.id}>
                 <Box flexShrink={0}>
-                  {gutter}
-                  <Text dimColor={!isFocused} bold={isFocused}>
+                  <Text>{'  '}</Text>
+                  <Text dimColor>
                     {formatTime(event.ts, now)}
                     {'  '}
                   </Text>
@@ -97,7 +124,7 @@ export function Feed({ groups, bottomIndex, focusIndex, agents, height, width, p
           <Scrollbar total={groups.length} start={start} height={rows.length} />
         </Box>
       </Box>
-      {focused ? (
+      {showIndicator ? (
         <Text color="cyan">
           {'  '}↓ {newerCount}개 더 아래 <Text dimColor>· [Enter] 자세히 [j/k] 이동 [G] 최신 따라가기</Text>
         </Text>
