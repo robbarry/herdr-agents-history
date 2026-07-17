@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDetail, formatTime } from './format.js'
+import { formatDetail, formatTime, wrapText } from './format.js'
 
 const HOME = '/Users/ray'
 const CWD = '/Users/ray/dev/my-app'
@@ -35,5 +35,30 @@ describe('formatTime', () => {
 
   it('shows the date for older events', () => {
     expect(formatTime(new Date('2026-07-06T16:10:02'), now)).toBe('07-06 16:10')
+  })
+})
+
+describe('wrapText', () => {
+  it('preserves existing newlines and wraps each line independently', () => {
+    expect(wrapText('short\nline', 20)).toEqual(['short', 'line'])
+  })
+
+  it('wraps a long line at the given width', () => {
+    expect(wrapText('a'.repeat(25), 10)).toEqual(['a'.repeat(10), 'a'.repeat(10), 'a'.repeat(5)])
+  })
+
+  it('keeps blank lines intact', () => {
+    expect(wrapText('a\n\nb', 10)).toEqual(['a', '', 'b'])
+  })
+
+  it('counts CJK characters as double-width so Korean text wraps narrower', () => {
+    // 10 Korean characters at width 10 must wrap after 5 (each is 2 columns wide)
+    const korean = '가나다라마바사아자차'
+    const wrapped = wrapText(korean, 10)
+    expect(wrapped).toEqual(['가나다라마', '바사아자차'])
+  })
+
+  it('never produces empty output for non-empty input', () => {
+    expect(wrapText('x', 10).length).toBeGreaterThan(0)
   })
 })

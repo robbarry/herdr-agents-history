@@ -5,7 +5,7 @@ const HINTS: Readonly<Record<string, string>> = {
   board: '[Tab] feed  [←→↑↓/hjkl] 이동  [Enter] 상세  [r] recap  [q] quit',
   detail: '[j/k] scroll  [g/G] 처음/끝  [Esc] board  [q] quit',
   recap: '[Esc/r] 돌아가기  [q] quit',
-  inspect: '[Esc/Enter] 돌아가기  [q] quit'
+  inspect: '[j/k] scroll  [g/G] 처음/끝  [Esc/Enter] 돌아가기  [q] quit'
 }
 
 interface Props {

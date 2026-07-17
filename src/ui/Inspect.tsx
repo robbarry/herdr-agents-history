@@ -4,11 +4,15 @@ import type { FeedGroup } from '../collapse.js'
 import type { AgentSnapshot, ToolEvent } from '../types.js'
 import { STATUS_ICON, agentColor, toolStyle } from '../theme.js'
 import { formatTime, padDisplay } from './format.js'
+import { computeInspectLayout } from './inspectLayout.js'
+import { Scrollbar } from './Scrollbar.js'
 
 interface Props {
   readonly group: FeedGroup | null
   readonly constituents: ToolEvent[]
   readonly agent: AgentSnapshot | null
+  /** lines scrolled down from the top of the raw content (0 = start) */
+  readonly scrollOffset: number
   readonly width: number
   readonly height: number
   readonly now: Date
@@ -27,7 +31,7 @@ function Row({ label, children }: { readonly label: string; readonly children: R
   )
 }
 
-export function Inspect({ group, constituents, agent, width, height, now }: Props) {
+export function Inspect({ group, constituents, agent, scrollOffset, width, height, now }: Props) {
   if (!group) {
     return (
       <Box height={height} justifyContent="center" alignItems="center">
@@ -44,6 +48,10 @@ export function Inspect({ group, constituents, agent, width, height, now }: Prop
     count > 1 && constituents.length > 0
       ? `${formatTime(constituents[0].ts, now).trim()} ~ ${formatTime(event.ts, now).trim()} (×${count})`
       : formatTime(event.ts, now).trim()
+
+  const { rawLines, rawAreaHeight } = computeInspectLayout(group, constituents, width, height)
+  const visibleRaw = rawLines.slice(scrollOffset, scrollOffset + rawAreaHeight)
+  const moreBelow = rawLines.length - (scrollOffset + visibleRaw.length)
 
   return (
     <Box flexDirection="column" paddingX={2} height={height} overflow="hidden">
@@ -86,16 +94,34 @@ export function Inspect({ group, constituents, agent, width, height, now }: Prop
         {event.raw ? (
           <>
             {divider}
-            <Text dimColor>{isTurn ? 'prompt 전문:' : 'input:'}</Text>
+            <Text dimColor>
+              {isTurn ? 'prompt 전문:' : 'input:'}
+              {rawLines.length > rawAreaHeight ? (
+                <Text dimColor>
+                  {' '}
+                  ({Math.min(scrollOffset + rawAreaHeight, rawLines.length)}/{rawLines.length} 줄)
+                </Text>
+              ) : null}
+            </Text>
           </>
         ) : null}
       </Box>
-      {event.raw ? (
-        <Box overflow="hidden" flexGrow={1} flexShrink={1}>
-          <Text wrap="wrap" dimColor={!isTurn}>
-            {event.raw}
-          </Text>
+      {event.raw && rawAreaHeight > 0 ? (
+        <Box flexDirection="row" flexGrow={1} flexShrink={1} overflow="hidden">
+          <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+            {visibleRaw.map((line, i) => (
+              <Text key={scrollOffset + i} dimColor={!isTurn} wrap="truncate">
+                {line || ' '}
+              </Text>
+            ))}
+          </Box>
+          <Box flexShrink={0} marginLeft={1}>
+            <Scrollbar total={rawLines.length} start={scrollOffset} height={visibleRaw.length} />
+          </Box>
         </Box>
+      ) : null}
+      {event.raw && moreBelow > 0 ? (
+        <Text dimColor>  ↓ {moreBelow}줄 더 <Text color="cyan">· [j/k] 스크롤 [g/G] 처음/끝</Text></Text>
       ) : null}
     </Box>
   )

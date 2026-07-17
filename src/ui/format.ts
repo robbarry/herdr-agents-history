@@ -19,13 +19,52 @@ function shortenPath(path: string, cwd: string, home: string): string {
   return path
 }
 
+const WIDE_CHAR = /[ᄀ-ᅟ㐀-꓏가-힣豈-﫿︰-﹏＀-￯]/
+
+/** Display width of one character — CJK glyphs render two terminal columns wide. */
+function charWidth(ch: string): number {
+  return WIDE_CHAR.test(ch) ? 2 : 1
+}
+
+function displayWidth(text: string): number {
+  return [...text].reduce((sum, ch) => sum + charWidth(ch), 0)
+}
+
 /** Pad to a display width, counting wide (CJK) characters as two columns. */
 export function padDisplay(text: string, width: number): string {
-  const displayWidth = [...text].reduce(
-    (sum, ch) => sum + (/[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/.test(ch) ? 2 : 1),
-    0
-  )
-  return text + ' '.repeat(Math.max(width - displayWidth, 0))
+  return text + ' '.repeat(Math.max(width - displayWidth(text), 0))
+}
+
+/**
+ * Word-wrap free-form text (tool input JSON, prompt bodies) to a display
+ * width, preserving existing newlines. Wraps by character rather than word
+ * since content is often mixed Korean/English — CJK text has no natural word
+ * boundaries, so character wrapping (with CJK counted as 2 columns) is the
+ * one strategy that works for both without special-casing either.
+ */
+export function wrapText(text: string, width: number): string[] {
+  if (width <= 0) return text.split('\n')
+  return text.split('\n').flatMap((line) => wrapLine(line, width))
+}
+
+function wrapLine(line: string, width: number): string[] {
+  const chars = [...line]
+  if (chars.length === 0) return ['']
+  const out: string[] = []
+  let current = ''
+  let currentWidth = 0
+  for (const ch of chars) {
+    const w = charWidth(ch)
+    if (currentWidth + w > width && current.length > 0) {
+      out.push(current)
+      current = ''
+      currentWidth = 0
+    }
+    current += ch
+    currentWidth += w
+  }
+  out.push(current)
+  return out
 }
 
 /** Today's events show the time; older backfill shows the date so it can't pass for recent. */

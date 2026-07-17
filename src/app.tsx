@@ -11,6 +11,7 @@ import { Feed } from './ui/Feed.js'
 import { Footer } from './ui/Footer.js'
 import { Header } from './ui/Header.js'
 import { Inspect } from './ui/Inspect.js'
+import { computeInspectLayout } from './ui/inspectLayout.js'
 import { Recap } from './ui/Recap.js'
 import type { AgentSnapshot, ToolEvent } from './types.js'
 
@@ -54,6 +55,7 @@ export function App() {
   const [view, setView] = useState<View>({ kind: 'feed' })
   const [selected, setSelected] = useState(0)
   const [scrollOffset, setScrollOffset] = useState(0)
+  const [inspectScroll, setInspectScroll] = useState(0)
   const [feedFocus, setFeedFocus] = useState<number | null>(null)
   /** firstId of the window's bottom-most visible group; null = follow live (bottom = newest) */
   const [feedWindowAnchor, setFeedWindowAnchor] = useState<number | null>(null)
@@ -101,6 +103,17 @@ export function App() {
     () => [...agents].sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key)),
     [agents]
   )
+
+  const inspectGroup = view.kind === 'inspect' ? (feedGroups.find((g) => g.firstId === view.firstId) ?? null) : null
+  const inspectConstituents = useMemo(() => {
+    if (!inspectGroup) return []
+    const g = inspectGroup
+    return visible.filter(
+      (e) => e.id >= g.firstId && e.id <= g.event.id && e.agentKey === g.event.agentKey && e.tool === g.event.tool && e.kind === g.event.kind
+    )
+  }, [inspectGroup, visible])
+  const inspectLayout = inspectGroup ? computeInspectLayout(inspectGroup, inspectConstituents, columns, bodyHeight) : null
+  const inspectMaxScroll = inspectLayout ? Math.max(inspectLayout.rawLines.length - inspectLayout.rawAreaHeight, 0) : 0
 
   useInput((input, key) => {
     if (filterMode) {
@@ -151,6 +164,7 @@ export function App() {
       else if (input === 'g') moveFocus(0)
       else if (input === 'G') goLive()
       else if (key.return && feedGroups.length > 0) {
+        setInspectScroll(0)
         setView({ kind: 'inspect', firstId: feedGroups[focusIndex ?? last].firstId })
       } else if (input.startsWith('/')) {
         // pasted chunks arrive as one input string: "/webfetch" seeds the filter
@@ -170,7 +184,14 @@ export function App() {
     }
 
     if (view.kind === 'inspect') {
+      const pageSize = Math.max((inspectLayout?.rawAreaHeight ?? 1) - 1, 1)
       if (key.escape || key.return || key.tab) setView({ kind: 'feed' })
+      else if (input === 'j' || key.downArrow) setInspectScroll((prev) => Math.min(prev + 1, inspectMaxScroll))
+      else if (input === 'k' || key.upArrow) setInspectScroll((prev) => Math.max(prev - 1, 0))
+      else if (key.pageDown) setInspectScroll((prev) => Math.min(prev + pageSize, inspectMaxScroll))
+      else if (key.pageUp) setInspectScroll((prev) => Math.max(prev - pageSize, 0))
+      else if (input === 'g') setInspectScroll(0)
+      else if (input === 'G') setInspectScroll(inspectMaxScroll)
       return
     }
 
@@ -217,29 +238,15 @@ export function App() {
           now={now}
         />
       ) : view.kind === 'inspect' ? (
-        (() => {
-          const group = feedGroups.find((g) => g.firstId === view.firstId) ?? null
-          const constituents = group
-            ? visible.filter(
-                (e) =>
-                  e.id >= group.firstId &&
-                  e.id <= group.event.id &&
-                  e.agentKey === group.event.agentKey &&
-                  e.tool === group.event.tool &&
-                  e.kind === group.event.kind
-              )
-            : []
-          return (
-            <Inspect
-              group={group}
-              constituents={constituents}
-              agent={agents.find((a) => a.key === group?.event.agentKey) ?? null}
-              width={columns}
-              height={bodyHeight}
-              now={now}
-            />
-          )
-        })()
+        <Inspect
+          group={inspectGroup}
+          constituents={inspectConstituents}
+          agent={agents.find((a) => a.key === inspectGroup?.event.agentKey) ?? null}
+          scrollOffset={inspectScroll}
+          width={columns}
+          height={bodyHeight}
+          now={now}
+        />
       ) : view.kind === 'recap' ? (
         <Recap stats={stats.current} width={columns} height={bodyHeight} now={now} />
       ) : view.kind === 'board' ? (
