@@ -64,10 +64,12 @@ Bind a key in `~/.config/herdr/config.toml` so one press opens it:
 
 ```toml
 [[keys.command]]
-key = "prefix+t"
+key = "prefix+h"
 type = "shell"
-command = "herdr plugin pane open --plugin cdragon.agent-tool-history --entrypoint feed"
+command = "herdr plugin pane open --plugin cdragon.agent-tool-history --entrypoint feed --placement split --direction down"
 ```
+
+(pick any key not already bound in your config — check with `grep 'key = ' ~/.config/herdr/config.toml`)
 
 Or open it manually:
 
