@@ -42,11 +42,11 @@
 ```
  ⚡ agent tools · live                                8 agents · 2 working · 14:32:07
 ──────────────────────────────────────────────────────────────────────────────────────
- 14:31:52  summer-camera   ✏️ Edit      src/pages/HomePage.tsx
- 14:31:57  summer-camera   ✏️ Edit      src/pages/HomePage.tsx          ×2 연속
- 14:32:02  summer-camera   🖥️ Bash      npx vitest run …HomePage.test.tsx
+ 14:31:52  photo-app   ✏️ Edit      src/pages/HomePage.tsx
+ 14:31:57  photo-app   ✏️ Edit      src/pages/HomePage.tsx          ×2 연속
+ 14:32:02  photo-app   🖥️ Bash      npx vitest run …HomePage.test.tsx
  14:32:04  herdr-history ● 🌐 WebFetch  herdr.dev/docs/plugins
- 14:32:05  gongcheck       📖 Read      src/lib/api/books.ts
+ 14:32:05  book-app       📖 Read      src/lib/api/books.ts
  14:32:07  herdr-history ● 🖥️ Bash      herdr plugin link …                      ← new
 ──────────────────────────────────────────────────────────────────────────────────────
  [Tab] board  [Enter] agent 상세  [/] filter  [p] pause  [q] quit
@@ -63,13 +63,13 @@
 agent별 카드 그리드. 2초 안에 전체 파악이 목표.
 
 ```
-┌─ 🟡 summer-camera · claude ────────────┐  ┌─ ⚪ gongcheck · claude ────────────────┐
+┌─ 🟡 photo-app · claude ────────────┐  ┌─ ⚪ book-app · claude ────────────────┐
 │ ▂▄▆█▇▅▃▁▂▄▆█  570 calls · 2h 14m      │  │ ▁▁▂▁▁▄▂▁▁▁▁▁  382 calls · idle 32m    │
 │ Bash  ████████████ 246                 │  │ Bash  ████████████ 272                 │
 │ Write █████ 99      Read ████ 94       │  │ Read  █ 29          Edit ▌18           │
 │ ▸ Bash  npx vitest run …test.tsx       │  │ ▸ Bash  python3 -c "names = […]"       │
 └────────────────────────────────────────┘  └────────────────────────────────────────┘
-┌─ 🟡 herdr-history · claude ────────────┐  ┌─ ⚪ money-manager · claude ────────────┐
+┌─ 🟡 herdr-history · claude ────────────┐  ┌─ ⚪ budget-app · claude ────────────┐
 │ ▁▁▁▁▁▁▁▂▅█▇▆  24 calls · 12m          │  │ …                                      │
 ```
 
@@ -83,7 +83,7 @@ agent별 카드 그리드. 2초 안에 전체 파악이 목표.
 agent 하나의 세션 타임라인 복기.
 
 ```
- 🔍 summer-camera · claude · session 227a8f78 · 570 calls
+ 🔍 photo-app · claude · session a1b2c3d4 · 570 calls
 ──────────────────────────────────────────────────────────────
  시간대별 활동   09h ▁▁ 10h ▄▆ 11h ██ … 15h ▇▃
  도구 분포      Bash 43% · Write 17% · Read 16% · Edit 13% · 기타 11%
@@ -109,12 +109,12 @@ flock의 감성을 통계로. 하루를 마감하는 리캡 카드.
  ────────────────────────────────────────────
  총 1,391 tool calls · agent 6명 · 활동 시간 7h 12m
 
- 🏆 오늘의 일꾼     summer-camera (570 calls)
- 🔨 Bash 장인      gongcheck (272회 — 전체의 71%가 Bash)
- 📚 다독왕         summer-camera (Read 94회)
- 🔥 최장 콤보      Edit ×12 연속 (summer-camera 15:19)
+ 🏆 오늘의 일꾼     photo-app (570 calls)
+ 🔨 Bash 장인      book-app (272회 — 전체의 71%가 Bash)
+ 📚 다독왕         photo-app (Read 94회)
+ 🔥 최장 콤보      Edit ×12 연속 (photo-app 15:19)
  🌐 바깥 구경      herdr-history (WebFetch 4회)
- 🤫 조용한 하루    handpartners (0 calls)
+ 🤫 조용한 하루    api-server (0 calls)
 ```
 
 - 뱃지/칭호는 하드코딩 규칙 6~8개로 시작 (구현 쉬움, 재미 큼)
@@ -134,7 +134,7 @@ TUI를 안 열어도 herdr 사이드바에서 보이도록, 데몬이 각 agent 
 `pane.report_metadata` 토큰을 주기적으로 리포트:
 
 ```
-claude · summer-camera   [✏️ Edit ×12]   ← 최근 5분간 주력 tool
+claude · photo-app   [✏️ Edit ×12]   ← 최근 5분간 주력 tool
 ```
 
 - 토큰 값 80자 제한 → "주력 tool + 횟수" 한 조각만
@@ -175,7 +175,7 @@ claude · summer-camera   [✏️ Edit ×12]   ← 최근 5분간 주력 tool
 | **M1** | Ink 골격 + 데이터 계층(watch 기반) + **Live Feed** | split에 켜두고 실시간 스트림이 흐른다 | ✅ 완료 |
 | **M2** | **Board + Detail** + 키보드 내비게이션 + 필터 | 글랜스→드릴다운 동선 완성 | ✅ 완료 |
 | **M3** | **Recap + 뱃지** + 사이드바 badge(옵션) | 스크린샷 찍고 싶은 화면 | ✅ 완료 |
-| **M4** | polish: `--ascii` 폴백, config, README(움짤!), topic `herdr-plugin` 달고 배포 | marketplace에 뜬다 | ✅ 배포 대기 (GitHub push만 남음) |
+| **M4** | polish: `--ascii` 폴백, config, README(움짤!), topic `herdr-plugin` 달고 배포 | marketplace에 뜬다 | ✅ 완료 (GitHub 공개 + topic 부착) |
 
 M1이 끝나면 그 시점부터 실사용하며 (dogfooding) M2~M3 우선순위를 조정한다.
 
