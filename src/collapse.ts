@@ -36,11 +36,15 @@ export function focusIndexFor(groups: readonly FeedGroup[], focusId: number | nu
 }
 
 /**
- * Bottom row of the visible window. Live mode follows the newest group; a
- * focused row sits at the window bottom, except near the top where the window
- * pins to the start so it stays full.
+ * Scroll the window by the minimum amount needed to keep focusIndex visible.
+ * If focus is already inside [windowBottom - listHeight + 1, windowBottom],
+ * the window does not move — only the highlighted row changes. The window
+ * only shifts once focus would move past its near edge (top or bottom),
+ * revealing exactly one more row at that edge.
  */
-export function windowBottom(groups: readonly FeedGroup[], focusIndex: number | null, listHeight: number): number {
-  if (focusIndex === null) return groups.length - 1
-  return Math.max(focusIndex, Math.min(listHeight - 1, groups.length - 1))
+export function clampWindow(focusIndex: number, windowBottom: number, listHeight: number, lastIndex: number): number {
+  const windowStart = Math.max(windowBottom - listHeight + 1, 0)
+  if (focusIndex > windowBottom) return Math.min(focusIndex, lastIndex)
+  if (focusIndex < windowStart) return Math.min(focusIndex + listHeight - 1, lastIndex)
+  return Math.min(windowBottom, lastIndex)
 }

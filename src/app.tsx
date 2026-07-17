@@ -1,6 +1,6 @@
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { collapseEvents, focusIndexFor, windowBottom } from './collapse.js'
+import { clampWindow, collapseEvents, focusIndexFor } from './collapse.js'
 import { Collector } from './collector/collector.js'
 import { getConfig } from './config.js'
 import { BadgeReporter } from './reporter.js'
@@ -55,6 +55,8 @@ export function App() {
   const [selected, setSelected] = useState(0)
   const [scrollOffset, setScrollOffset] = useState(0)
   const [feedFocus, setFeedFocus] = useState<number | null>(null)
+  /** firstId of the window's bottom-most visible group; null = follow live (bottom = newest) */
+  const [feedWindowAnchor, setFeedWindowAnchor] = useState<number | null>(null)
   const frozen = useRef<ToolEvent[] | null>(null)
   const stats = useRef(new StatsStore())
 
@@ -90,9 +92,10 @@ export function App() {
     return source.filter((event) => matchesFilter(event, filter))
   }, [events, filter, paused])
   const feedGroups = useMemo(() => collapseEvents(visible), [visible])
+  const feedLast = feedGroups.length - 1
   const focusIndex = focusIndexFor(feedGroups, feedFocus)
   const feedListHeight = focusIndex === null ? bodyHeight : Math.max(bodyHeight - 1, 1)
-  const feedBottom = windowBottom(feedGroups, focusIndex, feedListHeight)
+  const feedBottom = focusIndex === null ? feedLast : (focusIndexFor(feedGroups, feedWindowAnchor) ?? feedLast)
 
   const sortedAgents = useMemo(
     () => [...agents].sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key)),
@@ -120,29 +123,42 @@ export function App() {
     }
 
     if (view.kind === 'feed') {
-      const last = feedGroups.length - 1
-      const focusTo = (index: number) => {
-        // moving below the newest row returns to live-follow (no focus)
-        if (index > last || last < 0) setFeedFocus(null)
-        else setFeedFocus(feedGroups[Math.max(index, 0)]?.firstId ?? null)
+      const last = feedLast
+      const goLive = () => {
+        setFeedFocus(null)
+        setFeedWindowAnchor(null)
+      }
+      // moves focus to rawIndex, scrolling the window only the minimum
+      // amount needed to keep it visible (see clampWindow) — a fixed window
+      // that only shifts once focus reaches its near edge
+      const moveFocus = (rawIndex: number) => {
+        if (last < 0 || rawIndex > last) {
+          goLive()
+          return
+        }
+        const newIndex = Math.max(rawIndex, 0)
+        const newWindowBottom = clampWindow(newIndex, feedBottom, feedListHeight, last)
+        setFeedFocus(feedGroups[newIndex].firstId)
+        setFeedWindowAnchor(newWindowBottom >= last ? null : feedGroups[newWindowBottom].firstId)
       }
       if (key.tab) setView({ kind: 'board' })
       else if (input === 'r') setView({ kind: 'recap' })
-      else if (input === 'k' || key.upArrow) focusTo(focusIndex === null ? last : focusIndex - 1)
-      else if (input === 'j' || key.downArrow) focusTo(focusIndex === null ? last : focusIndex + 1)
-      else if (key.pageUp) focusTo((focusIndex ?? last) - (feedListHeight - 1))
-      else if (key.pageDown) focusTo(focusIndex === null ? last : focusIndex + (feedListHeight - 1))
-      else if (input === 'g') focusTo(0)
-      else if (input === 'G') setFeedFocus(null)
+      // first press from live lands exactly on the newest row (last), not last-1
+      else if (input === 'k' || key.upArrow) moveFocus(focusIndex === null ? last : focusIndex - 1)
+      else if (input === 'j' || key.downArrow) moveFocus(focusIndex === null ? last : focusIndex + 1)
+      else if (key.pageUp) moveFocus((focusIndex ?? last) - (feedListHeight - 1))
+      else if (key.pageDown) moveFocus((focusIndex ?? last) + (feedListHeight - 1))
+      else if (input === 'g') moveFocus(0)
+      else if (input === 'G') goLive()
       else if (key.return && feedGroups.length > 0) {
         setView({ kind: 'inspect', firstId: feedGroups[focusIndex ?? last].firstId })
       } else if (input.startsWith('/')) {
         // pasted chunks arrive as one input string: "/webfetch" seeds the filter
         setFilterMode(true)
         setFilter(input.slice(1))
-        setFeedFocus(null)
+        goLive()
       } else if (key.escape) {
-        if (focusIndex !== null) setFeedFocus(null)
+        if (focusIndex !== null) goLive()
         else setFilter('')
       } else if (input === 'p') {
         setPaused((prev) => {
