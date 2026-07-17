@@ -10,6 +10,7 @@ function event(overrides: Partial<ToolEvent>): ToolEvent {
     agentKey: 'term_1',
     agentLabel: 'my-app',
     agentKind: 'claude',
+    kind: 'tool',
     tool: 'Bash',
     detail: 'npm test',
     backfill: false,

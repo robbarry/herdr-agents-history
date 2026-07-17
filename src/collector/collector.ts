@@ -114,6 +114,7 @@ export class Collector extends EventEmitter {
       agentKey: snapshot.key,
       agentLabel: snapshot.label,
       agentKind: snapshot.kind,
+      kind: call.kind,
       tool: call.tool,
       detail: call.detail.replace(/\s+/g, ' ').trim(),
       backfill

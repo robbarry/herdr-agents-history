@@ -1,5 +1,6 @@
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { bottomIndexFor, collapseEvents } from './collapse.js'
 import { Collector } from './collector/collector.js'
 import { getConfig } from './config.js'
 import { BadgeReporter } from './reporter.js'
@@ -47,6 +48,7 @@ export function App() {
   const [view, setView] = useState<View>({ kind: 'feed' })
   const [selected, setSelected] = useState(0)
   const [scrollOffset, setScrollOffset] = useState(0)
+  const [feedAnchor, setFeedAnchor] = useState<number | null>(null)
   const frozen = useRef<ToolEvent[] | null>(null)
   const stats = useRef(new StatsStore())
 
@@ -54,7 +56,7 @@ export function App() {
     const collector = new Collector()
     const reporter = getConfig().badge ? new BadgeReporter(stats.current) : null
     const onEvent = (event: ToolEvent) => {
-      stats.current.add(event)
+      if (event.kind === 'tool') stats.current.add(event)
       setEvents((prev) => insertEvent(prev, event))
     }
     const onAgents = (list: AgentSnapshot[]) => {
@@ -76,6 +78,14 @@ export function App() {
   const columns = stdout?.columns ?? 100
   const rows = stdout?.rows ?? 30
   const bodyHeight = Math.max(rows - 3, 3)
+
+  const visible = useMemo(() => {
+    const source = paused && frozen.current ? frozen.current : events
+    return source.filter((event) => matchesFilter(event, filter))
+  }, [events, filter, paused])
+  const feedGroups = useMemo(() => collapseEvents(visible), [visible])
+  const feedBottom = bottomIndexFor(feedGroups, feedAnchor)
+
   const sortedAgents = useMemo(
     () => [...agents].sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key)),
     [agents]
@@ -102,14 +112,27 @@ export function App() {
     }
 
     if (view.kind === 'feed') {
+      const anchorTo = (index: number) => {
+        const next = Math.max(index, Math.min(bodyHeight - 2, feedGroups.length - 1))
+        setFeedAnchor(next >= feedGroups.length - 1 ? null : (feedGroups[next]?.firstId ?? null))
+      }
       if (key.tab) setView({ kind: 'board' })
       else if (input === 'r') setView({ kind: 'recap' })
+      else if (input === 'k' || key.upArrow) anchorTo(feedBottom - 1)
+      else if (input === 'j' || key.downArrow) anchorTo(feedBottom + 1)
+      else if (key.pageUp) anchorTo(feedBottom - (bodyHeight - 2))
+      else if (key.pageDown) anchorTo(feedBottom + (bodyHeight - 2))
+      else if (input === 'g') anchorTo(0)
+      else if (input === 'G') setFeedAnchor(null)
       else if (input.startsWith('/')) {
         // pasted chunks arrive as one input string: "/webfetch" seeds the filter
         setFilterMode(true)
         setFilter(input.slice(1))
-      } else if (key.escape) setFilter('')
-      else if (input === 'p') {
+        setFeedAnchor(null)
+      } else if (key.escape) {
+        setFilter('')
+        setFeedAnchor(null)
+      } else if (input === 'p') {
         setPaused((prev) => {
           frozen.current = prev ? null : events
           return !prev
@@ -143,11 +166,6 @@ export function App() {
     else if (input === 'G') setScrollOffset(0)
   })
 
-  const visible = useMemo(() => {
-    const source = paused && frozen.current ? frozen.current : events
-    return source.filter((event) => matchesFilter(event, filter))
-  }, [events, filter, paused])
-
   return (
     <Box flexDirection="column" width={columns} height={rows}>
       <Header agents={agents} now={now} paused={paused} view={view.kind} />
@@ -156,7 +174,9 @@ export function App() {
       </Box>
       {view.kind === 'feed' ? (
         <Feed
-          events={visible}
+          groups={feedGroups}
+          bottomIndex={feedBottom}
+          anchored={feedAnchor !== null}
           agents={agents}
           height={bodyHeight}
           width={columns}

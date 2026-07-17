@@ -29,10 +29,16 @@ export function parseCodexLine(line: string): ParsedToolCall[] {
   if (typeof payload !== 'object' || payload === null) return []
   const p = payload as Record<string, unknown>
   const type = typeof p['type'] === 'string' ? p['type'] : ''
-  if (!TOOL_CALL_TYPES.has(type)) return []
+  const ts = typeof rec['timestamp'] === 'string' ? rec['timestamp'] : ''
 
+  if (type === 'user_message') {
+    const message = typeof p['message'] === 'string' ? p['message'].trim() : ''
+    if (message.length === 0 || message.startsWith('<')) return []
+    return [{ ts, kind: 'turn', tool: '', detail: message.slice(0, 120) }]
+  }
+
+  if (!TOOL_CALL_TYPES.has(type)) return []
   const tool = typeof p['name'] === 'string' && p['name'].length > 0 ? p['name'] : type
   const detail = parseArguments(p['arguments'] ?? p['input'])
-  const ts = typeof rec['timestamp'] === 'string' ? rec['timestamp'] : ''
-  return [{ ts, tool, detail }]
+  return [{ ts, kind: 'tool', tool, detail }]
 }

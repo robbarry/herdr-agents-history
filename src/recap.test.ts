@@ -13,6 +13,7 @@ function event(agentKey: string, label: string, tool: string, minutesAgo: number
     agentKey,
     agentLabel: label,
     agentKind: 'claude',
+    kind: 'tool',
     tool,
     detail,
     backfill: false
