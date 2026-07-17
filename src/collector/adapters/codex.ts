@@ -2,6 +2,14 @@ import type { ParsedToolCall } from '../../types.js'
 
 const TOOL_CALL_TYPES = new Set(['function_call', 'custom_tool_call', 'tool_search_call'])
 
+function prettyJson(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
+}
+
 function parseArguments(raw: unknown): string {
   if (typeof raw !== 'string' || raw.length === 0) return ''
   if (!raw.startsWith('{')) return raw
@@ -34,11 +42,13 @@ export function parseCodexLine(line: string): ParsedToolCall[] {
   if (type === 'user_message') {
     const message = typeof p['message'] === 'string' ? p['message'].trim() : ''
     if (message.length === 0 || message.startsWith('<')) return []
-    return [{ ts, kind: 'turn', tool: '', detail: message.slice(0, 120) }]
+    return [{ ts, kind: 'turn', tool: '', detail: message.slice(0, 120), raw: message.slice(0, 2_000) }]
   }
 
   if (!TOOL_CALL_TYPES.has(type)) return []
   const tool = typeof p['name'] === 'string' && p['name'].length > 0 ? p['name'] : type
-  const detail = parseArguments(p['arguments'] ?? p['input'])
-  return [{ ts, kind: 'tool', tool, detail }]
+  const args = p['arguments'] ?? p['input']
+  const detail = parseArguments(args)
+  const raw = typeof args === 'string' ? prettyJson(args).slice(0, 4_000) : undefined
+  return [{ ts, kind: 'tool', tool, detail, raw }]
 }

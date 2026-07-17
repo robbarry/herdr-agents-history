@@ -8,6 +8,8 @@ export interface ToolEvent {
   readonly kind: 'tool' | 'turn'
   readonly tool: string
   readonly detail: string
+  /** full tool input (pretty JSON) or full prompt — shown in the inspect view */
+  readonly raw?: string
   readonly backfill: boolean
 }
 
@@ -26,4 +28,5 @@ export interface ParsedToolCall {
   readonly kind: 'tool' | 'turn'
   readonly tool: string
   readonly detail: string
+  readonly raw?: string
 }

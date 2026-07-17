@@ -55,7 +55,9 @@ export function parseClaudeLine(line: string): ParsedToolCall[] {
 
   if (rec['type'] === 'user') {
     const prompt = userPrompt(rec, content)
-    return prompt ? [{ ts, kind: 'turn', tool: '', detail: prompt.slice(0, 120) }] : []
+    return prompt
+      ? [{ ts, kind: 'turn', tool: '', detail: prompt.slice(0, 120), raw: prompt.slice(0, 2_000) }]
+      : []
   }
 
   if (!Array.isArray(content)) return []
@@ -64,6 +66,14 @@ export function parseClaudeLine(line: string): ParsedToolCall[] {
     const b = block as Record<string, unknown>
     if (b['type'] !== 'tool_use' || typeof b['name'] !== 'string') return []
     const input = typeof b['input'] === 'object' && b['input'] !== null ? (b['input'] as Record<string, unknown>) : {}
-    return [{ ts, kind: 'tool', tool: b['name'], detail: pickDetail(input) }]
+    return [
+      {
+        ts,
+        kind: 'tool',
+        tool: b['name'],
+        detail: pickDetail(input),
+        raw: JSON.stringify(input, null, 2).slice(0, 4_000)
+      }
+    ]
   })
 }

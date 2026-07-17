@@ -7,7 +7,7 @@ import { formatDetail, formatTime } from './format.js'
 interface Props {
   readonly groups: FeedGroup[]
   readonly bottomIndex: number
-  readonly anchored: boolean
+  readonly focusIndex: number | null
   readonly agents: AgentSnapshot[]
   readonly height: number
   readonly width: number
@@ -18,10 +18,10 @@ interface Props {
 const LABEL_WIDTH = 19
 const TOOL_WIDTH = 11
 
-export function Feed({ groups, bottomIndex, anchored, agents, height, width, pulse, now }: Props) {
+export function Feed({ groups, bottomIndex, focusIndex, agents, height, width, pulse, now }: Props) {
   const workingKeys = new Set(agents.filter((a) => a.status === 'working').map((a) => a.key))
   const cwdByKey = new Map(agents.map((a) => [a.key, a.cwd]))
-  const detailWidth = Math.max(width - (13 + LABEL_WIDTH + TOOL_WIDTH + 12), 10)
+  const detailWidth = Math.max(width - (13 + LABEL_WIDTH + TOOL_WIDTH + 14), 10)
 
   if (groups.length === 0) {
     return (
@@ -31,18 +31,25 @@ export function Feed({ groups, bottomIndex, anchored, agents, height, width, pul
     )
   }
 
-  const listHeight = anchored ? Math.max(height - 1, 1) : height
-  const rows = groups.slice(Math.max(bottomIndex - listHeight + 1, 0), bottomIndex + 1)
+  const focused = focusIndex !== null
+  const listHeight = focused ? Math.max(height - 1, 1) : height
+  const start = Math.max(bottomIndex - listHeight + 1, 0)
+  const rows = groups.slice(start, bottomIndex + 1)
   const newerCount = groups.length - 1 - bottomIndex
 
   return (
     <Box flexDirection="column" paddingX={1} height={height} overflow="hidden" justifyContent="flex-end">
-      {rows.map(({ event, count }) => {
+      {rows.map(({ event, count }, rowIndex) => {
+        const isFocused = focusIndex !== null && start + rowIndex === focusIndex
+        const gutter = isFocused ? <Text color="cyan">▸ </Text> : <Text>{'  '}</Text>
         if (event.kind === 'turn') {
           return (
             <Text key={event.id} wrap="truncate">
+              {gutter}
               <Text dimColor>{formatTime(event.ts, now)}  </Text>
-              <Text color={agentColor(event.agentKey)}>❯ {event.agentLabel.slice(0, LABEL_WIDTH - 2)}</Text>
+              <Text color={agentColor(event.agentKey)} bold={isFocused}>
+                ❯ {event.agentLabel.slice(0, LABEL_WIDTH - 2)}
+              </Text>
               <Text dimColor>
                 {' '}
                 “{event.detail}” {'─'.repeat(width)}
@@ -55,13 +62,19 @@ export function Feed({ groups, bottomIndex, anchored, agents, height, width, pul
         const label = event.agentLabel.slice(0, LABEL_WIDTH - 2)
         return (
           <Box key={event.id}>
-            <Text dimColor>{formatTime(event.ts, now)}  </Text>
-            <Text color={agentColor(event.agentKey)}>{label.padEnd(LABEL_WIDTH - 2)}</Text>
-            <Text color="yellowBright">{working && pulse ? '● ' : '  '}</Text>
-            <Text>{style.icon} </Text>
-            <Text color={style.color} bold>
-              {event.tool.slice(0, TOOL_WIDTH).padEnd(TOOL_WIDTH)}
-            </Text>
+            <Box flexShrink={0}>
+              {gutter}
+              <Text dimColor={!isFocused} bold={isFocused}>
+                {formatTime(event.ts, now)}
+                {'  '}
+              </Text>
+              <Text color={agentColor(event.agentKey)}>{label.padEnd(LABEL_WIDTH - 2)}</Text>
+              <Text color="yellowBright">{working && pulse ? '● ' : '  '}</Text>
+              <Text>{style.icon} </Text>
+              <Text color={style.color} bold>
+                {event.tool.slice(0, TOOL_WIDTH).padEnd(TOOL_WIDTH)}
+              </Text>
+            </Box>
             <Box flexGrow={1} flexShrink={1}>
               <Text dimColor wrap="truncate">
                 {' '}
@@ -76,9 +89,9 @@ export function Feed({ groups, bottomIndex, anchored, agents, height, width, pul
           </Box>
         )
       })}
-      {anchored ? (
+      {focused ? (
         <Text color="cyan">
-          {'  '}↓ {newerCount}개 더 아래 <Text dimColor>· [j] 아래로 [G] 최신 따라가기</Text>
+          {'  '}↓ {newerCount}개 더 아래 <Text dimColor>· [Enter] 자세히 [j/k] 이동 [G] 최신 따라가기</Text>
         </Text>
       ) : null}
     </Box>

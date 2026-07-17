@@ -1,6 +1,6 @@
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { bottomIndexFor, collapseEvents } from './collapse.js'
+import { collapseEvents, focusIndexFor, windowBottom } from './collapse.js'
 import { Collector } from './collector/collector.js'
 import { getConfig } from './config.js'
 import { BadgeReporter } from './reporter.js'
@@ -10,12 +10,18 @@ import { Detail } from './ui/Detail.js'
 import { Feed } from './ui/Feed.js'
 import { Footer } from './ui/Footer.js'
 import { Header } from './ui/Header.js'
+import { Inspect } from './ui/Inspect.js'
 import { Recap } from './ui/Recap.js'
 import type { AgentSnapshot, ToolEvent } from './types.js'
 
 const BUFFER_LIMIT = 1_000
 
-type View = { kind: 'feed' } | { kind: 'board' } | { kind: 'detail'; agentKey: string } | { kind: 'recap' }
+type View =
+  | { kind: 'feed' }
+  | { kind: 'board' }
+  | { kind: 'detail'; agentKey: string }
+  | { kind: 'recap' }
+  | { kind: 'inspect'; firstId: number }
 
 function insertEvent(events: ToolEvent[], event: ToolEvent): ToolEvent[] {
   const next = event.backfill
@@ -48,7 +54,7 @@ export function App() {
   const [view, setView] = useState<View>({ kind: 'feed' })
   const [selected, setSelected] = useState(0)
   const [scrollOffset, setScrollOffset] = useState(0)
-  const [feedAnchor, setFeedAnchor] = useState<number | null>(null)
+  const [feedFocus, setFeedFocus] = useState<number | null>(null)
   const frozen = useRef<ToolEvent[] | null>(null)
   const stats = useRef(new StatsStore())
 
@@ -84,7 +90,9 @@ export function App() {
     return source.filter((event) => matchesFilter(event, filter))
   }, [events, filter, paused])
   const feedGroups = useMemo(() => collapseEvents(visible), [visible])
-  const feedBottom = bottomIndexFor(feedGroups, feedAnchor)
+  const focusIndex = focusIndexFor(feedGroups, feedFocus)
+  const feedListHeight = focusIndex === null ? bodyHeight : Math.max(bodyHeight - 1, 1)
+  const feedBottom = windowBottom(feedGroups, focusIndex, feedListHeight)
 
   const sortedAgents = useMemo(
     () => [...agents].sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key)),
@@ -112,32 +120,41 @@ export function App() {
     }
 
     if (view.kind === 'feed') {
-      const anchorTo = (index: number) => {
-        const next = Math.max(index, Math.min(bodyHeight - 2, feedGroups.length - 1))
-        setFeedAnchor(next >= feedGroups.length - 1 ? null : (feedGroups[next]?.firstId ?? null))
+      const last = feedGroups.length - 1
+      const focusTo = (index: number) => {
+        // moving below the newest row returns to live-follow (no focus)
+        if (index > last || last < 0) setFeedFocus(null)
+        else setFeedFocus(feedGroups[Math.max(index, 0)]?.firstId ?? null)
       }
       if (key.tab) setView({ kind: 'board' })
       else if (input === 'r') setView({ kind: 'recap' })
-      else if (input === 'k' || key.upArrow) anchorTo(feedBottom - 1)
-      else if (input === 'j' || key.downArrow) anchorTo(feedBottom + 1)
-      else if (key.pageUp) anchorTo(feedBottom - (bodyHeight - 2))
-      else if (key.pageDown) anchorTo(feedBottom + (bodyHeight - 2))
-      else if (input === 'g') anchorTo(0)
-      else if (input === 'G') setFeedAnchor(null)
-      else if (input.startsWith('/')) {
+      else if (input === 'k' || key.upArrow) focusTo(focusIndex === null ? last : focusIndex - 1)
+      else if (input === 'j' || key.downArrow) focusTo(focusIndex === null ? last : focusIndex + 1)
+      else if (key.pageUp) focusTo((focusIndex ?? last) - (feedListHeight - 1))
+      else if (key.pageDown) focusTo(focusIndex === null ? last : focusIndex + (feedListHeight - 1))
+      else if (input === 'g') focusTo(0)
+      else if (input === 'G') setFeedFocus(null)
+      else if (key.return && feedGroups.length > 0) {
+        setView({ kind: 'inspect', firstId: feedGroups[focusIndex ?? last].firstId })
+      } else if (input.startsWith('/')) {
         // pasted chunks arrive as one input string: "/webfetch" seeds the filter
         setFilterMode(true)
         setFilter(input.slice(1))
-        setFeedAnchor(null)
+        setFeedFocus(null)
       } else if (key.escape) {
-        setFilter('')
-        setFeedAnchor(null)
+        if (focusIndex !== null) setFeedFocus(null)
+        else setFilter('')
       } else if (input === 'p') {
         setPaused((prev) => {
           frozen.current = prev ? null : events
           return !prev
         })
       }
+      return
+    }
+
+    if (view.kind === 'inspect') {
+      if (key.escape || key.return || key.tab) setView({ kind: 'feed' })
       return
     }
 
@@ -176,13 +193,37 @@ export function App() {
         <Feed
           groups={feedGroups}
           bottomIndex={feedBottom}
-          anchored={feedAnchor !== null}
+          focusIndex={focusIndex}
           agents={agents}
           height={bodyHeight}
           width={columns}
           pulse={now.getSeconds() % 2 === 0}
           now={now}
         />
+      ) : view.kind === 'inspect' ? (
+        (() => {
+          const group = feedGroups.find((g) => g.firstId === view.firstId) ?? null
+          const constituents = group
+            ? visible.filter(
+                (e) =>
+                  e.id >= group.firstId &&
+                  e.id <= group.event.id &&
+                  e.agentKey === group.event.agentKey &&
+                  e.tool === group.event.tool &&
+                  e.kind === group.event.kind
+              )
+            : []
+          return (
+            <Inspect
+              group={group}
+              constituents={constituents}
+              agent={agents.find((a) => a.key === group?.event.agentKey) ?? null}
+              width={columns}
+              height={bodyHeight}
+              now={now}
+            />
+          )
+        })()
       ) : view.kind === 'recap' ? (
         <Recap stats={stats.current} width={columns} height={bodyHeight} now={now} />
       ) : view.kind === 'board' ? (

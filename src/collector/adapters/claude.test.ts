@@ -25,12 +25,13 @@ const toolUseLine = JSON.stringify({
 })
 
 describe('parseClaudeLine', () => {
-  it('extracts every tool_use block with a detail hint', () => {
+  it('extracts every tool_use block with a detail hint and the full input as raw', () => {
     const calls = parseClaudeLine(toolUseLine)
-    expect(calls).toEqual([
+    expect(calls).toMatchObject([
       { ts: '2026-07-06T16:10:02.123Z', kind: 'tool', tool: 'Bash', detail: 'node scripts/build-dashboard.mjs' },
       { ts: '2026-07-06T16:10:02.123Z', kind: 'tool', tool: 'Read', detail: '/tmp/screenshot.png' }
     ])
+    expect(calls[0].raw).toContain('"description": "Build dashboard"')
   })
 
   it('turns a genuine user prompt into a turn boundary', () => {
@@ -40,7 +41,7 @@ describe('parseClaudeLine', () => {
       isSidechain: false,
       message: { role: 'user', content: '다음 기능 추가 봐줘. 스크롤 지원' }
     })
-    expect(parseClaudeLine(line)).toEqual([
+    expect(parseClaudeLine(line)).toMatchObject([
       { ts: '2026-07-17T05:00:00.000Z', kind: 'turn', tool: '', detail: '다음 기능 추가 봐줘. 스크롤 지원' }
     ])
   })

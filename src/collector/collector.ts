@@ -117,6 +117,7 @@ export class Collector extends EventEmitter {
       kind: call.kind,
       tool: call.tool,
       detail: call.detail.replace(/\s+/g, ' ').trim(),
+      raw: call.raw,
       backfill
     }
     this.emit('event', event)

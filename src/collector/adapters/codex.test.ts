@@ -14,7 +14,7 @@ const functionCallLine = JSON.stringify({
 
 describe('parseCodexLine', () => {
   it('extracts function_call records with the shell command as detail', () => {
-    expect(parseCodexLine(functionCallLine)).toEqual([
+    expect(parseCodexLine(functionCallLine)).toMatchObject([
       { ts: '2026-07-17T03:49:56.000Z', kind: 'tool', tool: 'exec_command', detail: 'codex --version' }
     ])
   })
@@ -24,7 +24,7 @@ describe('parseCodexLine', () => {
       timestamp: '2026-07-17T03:45:00.000Z',
       payload: { type: 'user_message', message: 'lazy codex 삭제해줘' }
     })
-    expect(parseCodexLine(line)).toEqual([
+    expect(parseCodexLine(line)).toMatchObject([
       { ts: '2026-07-17T03:45:00.000Z', kind: 'turn', tool: '', detail: 'lazy codex 삭제해줘' }
     ])
     const envContext = JSON.stringify({
@@ -38,7 +38,7 @@ describe('parseCodexLine', () => {
       timestamp: '2026-07-17T03:50:11.000Z',
       payload: { type: 'custom_tool_call', name: 'update_plan', arguments: '{"plan":[{"step":"a"}]}' }
     })
-    expect(parseCodexLine(line)).toEqual([
+    expect(parseCodexLine(line)).toMatchObject([
       { ts: '2026-07-17T03:50:11.000Z', kind: 'tool', tool: 'update_plan', detail: '{"plan":[{"step":"a"}]}' }
     ])
   })

@@ -5,7 +5,8 @@ const VIEW_LABEL: Readonly<Record<string, string>> = {
   feed: 'live',
   board: 'board',
   detail: 'detail',
-  recap: 'recap'
+  recap: 'recap',
+  inspect: 'inspect'
 }
 
 interface Props {

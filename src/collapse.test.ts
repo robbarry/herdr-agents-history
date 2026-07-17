@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bottomIndexFor, collapseEvents } from './collapse.js'
+import { collapseEvents, focusIndexFor, windowBottom } from './collapse.js'
 import type { ToolEvent } from './types.js'
 
 let nextId = 1
@@ -38,11 +38,20 @@ describe('collapseEvents', () => {
   })
 })
 
-describe('bottomIndexFor', () => {
-  it('follows the newest group when live, resolves anchors, and survives trimmed anchors', () => {
+describe('focusIndexFor / windowBottom', () => {
+  it('resolves focus ids and falls back to live when the anchor is trimmed away', () => {
     const groups = collapseEvents([event({}), event({ tool: 'Bash' }), event({ tool: 'Read' })])
-    expect(bottomIndexFor(groups, null)).toBe(2)
-    expect(bottomIndexFor(groups, groups[1].firstId)).toBe(1)
-    expect(bottomIndexFor(groups, 99_999)).toBe(2)
+    expect(focusIndexFor(groups, null)).toBeNull()
+    expect(focusIndexFor(groups, groups[1].firstId)).toBe(1)
+    expect(focusIndexFor(groups, 99_999)).toBeNull()
+  })
+
+  it('keeps the focused row visible: bottom-aligned normally, window pinned near the top', () => {
+    const groups = collapseEvents(
+      Array.from({ length: 10 }, (_, i) => event({ tool: `T${i}` }))
+    )
+    expect(windowBottom(groups, null, 5)).toBe(9) // live follows newest
+    expect(windowBottom(groups, 7, 5)).toBe(7) // focused row at window bottom
+    expect(windowBottom(groups, 1, 5)).toBe(4) // near the top the window stays full
   })
 })

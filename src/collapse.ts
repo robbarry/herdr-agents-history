@@ -28,9 +28,19 @@ export function collapseEvents(events: readonly ToolEvent[]): FeedGroup[] {
   }, [])
 }
 
-/** Index of the bottom visible group: the anchored group, or the newest when live. */
-export function bottomIndexFor(groups: readonly FeedGroup[], anchor: number | null): number {
-  if (anchor === null) return groups.length - 1
-  const index = groups.findIndex((group) => group.firstId === anchor)
-  return index === -1 ? groups.length - 1 : index
+/** Index of the focused group, or null when live-following (focus lost → live). */
+export function focusIndexFor(groups: readonly FeedGroup[], focusId: number | null): number | null {
+  if (focusId === null) return null
+  const index = groups.findIndex((group) => group.firstId === focusId)
+  return index === -1 ? null : index
+}
+
+/**
+ * Bottom row of the visible window. Live mode follows the newest group; a
+ * focused row sits at the window bottom, except near the top where the window
+ * pins to the start so it stays full.
+ */
+export function windowBottom(groups: readonly FeedGroup[], focusIndex: number | null, listHeight: number): number {
+  if (focusIndex === null) return groups.length - 1
+  return Math.max(focusIndex, Math.min(listHeight - 1, groups.length - 1))
 }
