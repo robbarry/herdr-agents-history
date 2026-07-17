@@ -174,8 +174,8 @@ claude · summer-camera   [✏️ Edit ×12]   ← 최근 5분간 주력 tool
 |---|---|---|---|
 | **M1** | Ink 골격 + 데이터 계층(watch 기반) + **Live Feed** | split에 켜두고 실시간 스트림이 흐른다 | ✅ 완료 |
 | **M2** | **Board + Detail** + 키보드 내비게이션 + 필터 | 글랜스→드릴다운 동선 완성 | ✅ 완료 |
-| **M3** | **Recap + 뱃지** + 사이드바 badge(옵션) | 스크린샷 찍고 싶은 화면 | |
-| **M4** | polish: `--ascii` 폴백, config, README(움짤!), topic `herdr-plugin` 달고 배포 | marketplace에 뜬다 | |
+| **M3** | **Recap + 뱃지** + 사이드바 badge(옵션) | 스크린샷 찍고 싶은 화면 | ✅ 완료 |
+| **M4** | polish: `--ascii` 폴백, config, README(움짤!), topic `herdr-plugin` 달고 배포 | marketplace에 뜬다 | ✅ 배포 대기 (GitHub push만 남음) |
 
 M1이 끝나면 그 시점부터 실사용하며 (dogfooding) M2~M3 우선순위를 조정한다.
 
