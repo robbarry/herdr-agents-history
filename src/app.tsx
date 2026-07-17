@@ -1,0 +1,191 @@
+import { Box, Text, useApp, useInput, useStdout } from 'ink'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Collector } from './collector/collector.js'
+import { getConfig } from './config.js'
+import { BadgeReporter } from './reporter.js'
+import { StatsStore } from './stats.js'
+import { Board, cardsPerRow } from './ui/Board.js'
+import { Detail } from './ui/Detail.js'
+import { Feed } from './ui/Feed.js'
+import { Footer } from './ui/Footer.js'
+import { Header } from './ui/Header.js'
+import { Recap } from './ui/Recap.js'
+import type { AgentSnapshot, ToolEvent } from './types.js'
+
+const BUFFER_LIMIT = 1_000
+
+type View = { kind: 'feed' } | { kind: 'board' } | { kind: 'detail'; agentKey: string } | { kind: 'recap' }
+
+function insertEvent(events: ToolEvent[], event: ToolEvent): ToolEvent[] {
+  const next = event.backfill
+    ? (() => {
+        const at = events.findIndex((e) => e.ts.getTime() > event.ts.getTime())
+        return at === -1 ? [...events, event] : [...events.slice(0, at), event, ...events.slice(at)]
+      })()
+    : [...events, event]
+  return next.length > BUFFER_LIMIT ? next.slice(-BUFFER_LIMIT) : next
+}
+
+function matchesFilter(event: ToolEvent, filter: string): boolean {
+  if (filter.length === 0) return true
+  const haystack = `${event.agentLabel} ${event.agentKind} ${event.tool} ${event.detail}`.toLowerCase()
+  return filter
+    .toLowerCase()
+    .split(/\s+/)
+    .every((term) => haystack.includes(term))
+}
+
+export function App() {
+  const { exit } = useApp()
+  const { stdout } = useStdout()
+  const [events, setEvents] = useState<ToolEvent[]>([])
+  const [agents, setAgents] = useState<AgentSnapshot[]>([])
+  const [now, setNow] = useState(() => new Date())
+  const [paused, setPaused] = useState(false)
+  const [filter, setFilter] = useState('')
+  const [filterMode, setFilterMode] = useState(false)
+  const [view, setView] = useState<View>({ kind: 'feed' })
+  const [selected, setSelected] = useState(0)
+  const [scrollOffset, setScrollOffset] = useState(0)
+  const frozen = useRef<ToolEvent[] | null>(null)
+  const stats = useRef(new StatsStore())
+
+  useEffect(() => {
+    const collector = new Collector()
+    const reporter = getConfig().badge ? new BadgeReporter(stats.current) : null
+    const onEvent = (event: ToolEvent) => {
+      stats.current.add(event)
+      setEvents((prev) => insertEvent(prev, event))
+    }
+    const onAgents = (list: AgentSnapshot[]) => {
+      setAgents(list)
+      reporter?.update(list)
+    }
+    collector.on('event', onEvent)
+    collector.on('agents', onAgents)
+    collector.start()
+    reporter?.start()
+    const clock = setInterval(() => setNow(new Date()), 1_000)
+    return () => {
+      clearInterval(clock)
+      collector.stop()
+      reporter?.stop()
+    }
+  }, [])
+
+  const columns = stdout?.columns ?? 100
+  const rows = stdout?.rows ?? 30
+  const bodyHeight = Math.max(rows - 3, 3)
+  const sortedAgents = useMemo(
+    () => [...agents].sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key)),
+    [agents]
+  )
+
+  useInput((input, key) => {
+    if (filterMode) {
+      if (key.return) setFilterMode(false)
+      else if (key.escape) {
+        setFilter('')
+        setFilterMode(false)
+      } else if (key.backspace || key.delete) setFilter((prev) => prev.slice(0, -1))
+      else if (input && !key.ctrl && !key.meta) setFilter((prev) => prev + input)
+      return
+    }
+    if (input === 'q') {
+      exit()
+      return
+    }
+
+    if (view.kind === 'recap') {
+      if (key.escape || key.tab || input === 'r') setView({ kind: 'feed' })
+      return
+    }
+
+    if (view.kind === 'feed') {
+      if (key.tab) setView({ kind: 'board' })
+      else if (input === 'r') setView({ kind: 'recap' })
+      else if (input.startsWith('/')) {
+        // pasted chunks arrive as one input string: "/webfetch" seeds the filter
+        setFilterMode(true)
+        setFilter(input.slice(1))
+      } else if (key.escape) setFilter('')
+      else if (input === 'p') {
+        setPaused((prev) => {
+          frozen.current = prev ? null : events
+          return !prev
+        })
+      }
+      return
+    }
+
+    if (view.kind === 'board') {
+      const perRow = cardsPerRow(columns)
+      const clamp = (index: number) => Math.min(Math.max(index, 0), Math.max(sortedAgents.length - 1, 0))
+      if (key.tab || key.escape) setView({ kind: 'feed' })
+      else if (input === 'r') setView({ kind: 'recap' })
+      else if (key.return && sortedAgents[selected]) {
+        setScrollOffset(0)
+        setView({ kind: 'detail', agentKey: sortedAgents[selected].key })
+      } else if (key.leftArrow || input === 'h') setSelected((prev) => clamp(prev - 1))
+      else if (key.rightArrow || input === 'l') setSelected((prev) => clamp(prev + 1))
+      else if (key.upArrow || input === 'k') setSelected((prev) => clamp(prev - perRow))
+      else if (key.downArrow || input === 'j') setSelected((prev) => clamp(prev + perRow))
+      return
+    }
+
+    // detail
+    const total = stats.current.forAgent(view.agentKey)?.events.length ?? 0
+    const maxOffset = Math.max(total - 1, 0)
+    if (key.escape || key.tab) setView({ kind: 'board' })
+    else if (input === 'k' || key.upArrow) setScrollOffset((prev) => Math.min(prev + 1, maxOffset))
+    else if (input === 'j' || key.downArrow) setScrollOffset((prev) => Math.max(prev - 1, 0))
+    else if (input === 'g') setScrollOffset(maxOffset)
+    else if (input === 'G') setScrollOffset(0)
+  })
+
+  const visible = useMemo(() => {
+    const source = paused && frozen.current ? frozen.current : events
+    return source.filter((event) => matchesFilter(event, filter))
+  }, [events, filter, paused])
+
+  return (
+    <Box flexDirection="column" width={columns} height={rows}>
+      <Header agents={agents} now={now} paused={paused} view={view.kind} />
+      <Box paddingX={1}>
+        <Text dimColor>{'─'.repeat(Math.max(columns - 2, 1))}</Text>
+      </Box>
+      {view.kind === 'feed' ? (
+        <Feed
+          events={visible}
+          agents={agents}
+          height={bodyHeight}
+          width={columns}
+          pulse={now.getSeconds() % 2 === 0}
+          now={now}
+        />
+      ) : view.kind === 'recap' ? (
+        <Recap stats={stats.current} width={columns} height={bodyHeight} now={now} />
+      ) : view.kind === 'board' ? (
+        <Board
+          agents={sortedAgents}
+          stats={stats.current}
+          selected={Math.min(selected, Math.max(sortedAgents.length - 1, 0))}
+          width={columns}
+          height={bodyHeight}
+          now={now}
+        />
+      ) : (
+        <Detail
+          agent={sortedAgents.find((agent) => agent.key === view.agentKey) ?? null}
+          agentKey={view.agentKey}
+          stats={stats.current}
+          scrollOffset={scrollOffset}
+          width={columns}
+          height={bodyHeight}
+          now={now}
+        />
+      )}
+      <Footer view={view.kind} filter={filter} filterMode={filterMode} />
+    </Box>
+  )
+}

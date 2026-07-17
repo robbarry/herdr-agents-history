@@ -1,0 +1,24 @@
+id = "cdragon.agent-tool-history"
+name = "Agent Tool History"
+version = "0.2.0"
+min_herdr_version = "0.7.0"
+description = "See which tools each agent in your herdr session has been using"
+platforms = ["macos", "linux"]
+
+[[build]]
+command = ["npm", "ci"]
+
+[[build]]
+command = ["npm", "run", "build"]
+
+[[actions]]
+id = "show"
+title = "Show agent tool history (one-shot)"
+contexts = ["workspace"]
+command = ["python3", "bin/agent_tools.py", "--once"]
+
+[[panes]]
+id = "feed"
+title = "Agent tool feed"
+placement = "split"
+command = ["node", "dist/cli.js"]
