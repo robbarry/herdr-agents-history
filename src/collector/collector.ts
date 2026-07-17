@@ -24,7 +24,7 @@ interface TrackedAgent {
 /**
  * Bridges herdr (which agents exist, their sessions) to the local transcript
  * files (what tools those sessions used). Emits:
- *   'event'  (event: ToolEvent)      — one tool call
+ *   'events' (events: ToolEvent[])     — a batch of tool calls (one drain)
  *   'agents' (agents: AgentSnapshot[]) — refreshed agent list
  */
 export class Collector extends EventEmitter {
@@ -99,16 +99,17 @@ export class Collector extends EventEmitter {
     if (!transcript || this.stopped) return null
 
     const parse = PARSERS[snapshot.kind]
-    const tailer = new TranscriptTailer(transcript, (line, backfill) => {
-      parse(line).forEach((call) => this.emitEvent(snapshot, call, backfill))
+    const tailer = new TranscriptTailer(transcript, (lines, backfill) => {
+      const events = lines.flatMap((line) => parse(line).map((call) => this.makeEvent(snapshot, call, backfill)))
+      if (events.length > 0) this.emit('events', events)
     })
     void tailer.start()
     return tailer
   }
 
-  private emitEvent(snapshot: AgentSnapshot, call: ParsedToolCall, backfill: boolean): void {
+  private makeEvent(snapshot: AgentSnapshot, call: ParsedToolCall, backfill: boolean): ToolEvent {
     const parsed = Date.parse(call.ts)
-    const event: ToolEvent = {
+    return {
       id: this.nextEventId++,
       ts: Number.isNaN(parsed) ? new Date() : new Date(parsed),
       agentKey: snapshot.key,
@@ -120,7 +121,6 @@ export class Collector extends EventEmitter {
       raw: call.raw,
       backfill
     }
-    this.emit('event', event)
   }
 
   agents(): AgentSnapshot[] {

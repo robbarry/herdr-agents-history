@@ -1,5 +1,6 @@
 import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { insertEvents } from './buffer.js'
 import { clampWindow, collapseEvents, focusIndexFor } from './collapse.js'
 import { Collector } from './collector/collector.js'
 import { getConfig } from './config.js'
@@ -15,24 +16,12 @@ import { computeInspectLayout } from './ui/inspectLayout.js'
 import { Recap } from './ui/Recap.js'
 import type { AgentSnapshot, ToolEvent } from './types.js'
 
-const BUFFER_LIMIT = 1_000
-
 type View =
   | { kind: 'feed' }
   | { kind: 'board' }
   | { kind: 'detail'; agentKey: string }
   | { kind: 'recap' }
   | { kind: 'inspect'; firstId: number }
-
-function insertEvent(events: ToolEvent[], event: ToolEvent): ToolEvent[] {
-  const next = event.backfill
-    ? (() => {
-        const at = events.findIndex((e) => e.ts.getTime() > event.ts.getTime())
-        return at === -1 ? [...events, event] : [...events.slice(0, at), event, ...events.slice(at)]
-      })()
-    : [...events, event]
-  return next.length > BUFFER_LIMIT ? next.slice(-BUFFER_LIMIT) : next
-}
 
 function matchesFilter(event: ToolEvent, filter: string): boolean {
   if (filter.length === 0) return true
@@ -65,15 +54,15 @@ export function App() {
   useEffect(() => {
     const collector = new Collector()
     const reporter = getConfig().badge ? new BadgeReporter(stats.current) : null
-    const onEvent = (event: ToolEvent) => {
-      if (event.kind === 'tool') stats.current.add(event)
-      setEvents((prev) => insertEvent(prev, event))
+    const onEvents = (batch: ToolEvent[]) => {
+      for (const event of batch) if (event.kind === 'tool') stats.current.add(event)
+      setEvents((prev) => insertEvents(prev, batch))
     }
     const onAgents = (list: AgentSnapshot[]) => {
       setAgents(list)
       reporter?.update(list)
     }
-    collector.on('event', onEvent)
+    collector.on('events', onEvents)
     collector.on('agents', onAgents)
     collector.start()
     reporter?.start()

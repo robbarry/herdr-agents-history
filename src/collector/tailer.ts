@@ -16,7 +16,9 @@ export class TranscriptTailer {
 
   constructor(
     private readonly filePath: string,
-    private readonly onLine: (line: string, backfill: boolean) => void
+    // one call per drain carrying every non-blank line read, so consumers can
+    // process a whole transcript (or a poll's worth of appends) as one batch
+    private readonly onLines: (lines: string[], backfill: boolean) => void
   ) {}
 
   async start(): Promise<void> {
@@ -55,7 +57,8 @@ export class TranscriptTailer {
           const chunk = this.remainder + buffer.toString('utf8')
           const lines = chunk.split('\n')
           this.remainder = lines.pop() ?? ''
-          lines.filter((line) => line.trim().length > 0).forEach((line) => this.onLine(line, backfill))
+          const kept = lines.filter((line) => line.trim().length > 0)
+          if (kept.length > 0) this.onLines(kept, backfill)
         } finally {
           await handle.close()
         }
