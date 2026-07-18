@@ -6,6 +6,8 @@ herdr's sidebar tells you an agent is `working`. This plugin tells you *what it'
 
 Supports **Claude Code** and **Codex** sessions out of the box.
 
+![Live Feed — every agent's tool calls streaming in one pane, with turn dividers and ×N collapsing](assets/main.png)
+
 ## Views
 
 One pane, four views. `Tab` and single keys move between them.
@@ -44,9 +46,13 @@ One card per agent: status, an activity sparkline, top tools, last call. Two sec
 
 One agent's session, reviewable: hourly activity, tool distribution, most-touched files, and a scrollable timeline (`j/k`, `g/G`).
 
+![Detail — one agent's session: activity sparkline, tool distribution, top files, and a scrollable timeline](assets/detail.png)
+
 ### 🌙 Recap (`r`)
 
 Today's wrap-up with awards — who worked hardest, the longest same-tool combo, the terminal artisan, the bookworm, and who had a quiet day. Screenshot material.
+
+![Recap — today's awards: hardest worker, longest combo, terminal artisan, and who had a quiet day](assets/recap.png)
 
 ## Sidebar badges
 
