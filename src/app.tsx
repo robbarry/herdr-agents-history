@@ -101,7 +101,7 @@ export function App() {
       (e) => e.id >= g.firstId && e.id <= g.event.id && e.agentKey === g.event.agentKey && e.tool === g.event.tool && e.kind === g.event.kind
     )
   }, [inspectGroup, visible])
-  const inspectLayout = inspectGroup ? computeInspectLayout(inspectGroup, inspectConstituents, columns, bodyHeight) : null
+  const inspectLayout = inspectGroup ? computeInspectLayout(inspectGroup, inspectConstituents, columns, bodyHeight, now) : null
   const inspectMaxScroll = inspectLayout ? Math.max(inspectLayout.rawLines.length - inspectLayout.rawAreaHeight, 0) : 0
 
   useInput((input, key) => {

@@ -49,7 +49,13 @@ export function Inspect({ group, constituents, agent, scrollOffset, width, heigh
       ? `${formatTime(constituents[0].ts, now).trim()} ~ ${formatTime(event.ts, now).trim()} (×${count})`
       : formatTime(event.ts, now).trim()
 
-  const { rawLines, rawAreaHeight } = computeInspectLayout(group, constituents, width, height)
+  const { detailLines, constituentPreviews, constituentOverflow, rawLines, rawAreaHeight } = computeInspectLayout(
+    group,
+    constituents,
+    width,
+    height,
+    now
+  )
   const visibleRaw = rawLines.slice(scrollOffset, scrollOffset + rawAreaHeight)
   const moreBelow = rawLines.length - (scrollOffset + visibleRaw.length)
 
@@ -73,22 +79,35 @@ export function Inspect({ group, constituents, agent, scrollOffset, width, heigh
         <Row label="time">
           <Text>{timeLabel}</Text>
         </Row>
-        {!isTurn && event.detail.length > 0 ? (
-          <Row label="detail">
-            <Text wrap="truncate-end">{event.detail}</Text>
-          </Row>
+        {detailLines.length > 0 ? (
+          <Box flexDirection="column">
+            {detailLines.map((line, i) => (
+              <Box key={i}>
+                <Box flexShrink={0}>
+                  <Text dimColor>{padDisplay(i === 0 ? 'detail' : '', 10)}</Text>
+                </Box>
+                <Box flexGrow={1} flexShrink={1}>
+                  <Text wrap="truncate">{line}</Text>
+                </Box>
+              </Box>
+            ))}
+          </Box>
         ) : null}
         {count > 1 ? (
           <>
             {divider}
             <Text dimColor>연속 호출 {count}회:</Text>
-            {constituents.slice(-8).map((item) => (
-              <Text key={item.id} wrap="truncate">
-                <Text dimColor>{formatTime(item.ts, now)}  </Text>
-                <Text>{item.detail || '(no detail)'}</Text>
-              </Text>
+            {constituentPreviews.map((preview) => (
+              <Box key={preview.id} flexDirection="column">
+                {preview.lines.map((line, i) => (
+                  <Text key={i} wrap="truncate">
+                    <Text dimColor>{i === 0 ? `${preview.time}  ` : ' '.repeat(13)}</Text>
+                    <Text>{line}</Text>
+                  </Text>
+                ))}
+              </Box>
             ))}
-            {constituents.length > 8 ? <Text dimColor>  … 외 {constituents.length - 8}회</Text> : null}
+            {constituentOverflow > 0 ? <Text dimColor>  … 외 {constituentOverflow}회</Text> : null}
           </>
         ) : null}
         {event.raw ? (
