@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDetail, formatTime, padDisplay, wrapText } from './format.js'
+import { formatDetail, formatTime, padDisplay, truncateDisplay, wrapText } from './format.js'
 
 const HOME = '/Users/ray'
 const CWD = '/Users/ray/dev/my-app'
@@ -85,5 +85,25 @@ describe('padDisplay', () => {
 
   it('does not pad when already at or over width', () => {
     expect(padDisplay('abcdef', 3)).toBe('abcdef')
+  })
+})
+
+describe('truncateDisplay', () => {
+  it('leaves short text untouched', () => {
+    expect(truncateDisplay('abc', 10)).toBe('abc')
+  })
+
+  it('cuts long single-line text down to the display width', () => {
+    // guards a real bug: handing Ink's own wrap="truncate" a 200+ char
+    // assembled turn-row string made it miscompute the row's height and
+    // bleed the next row's content onto the same terminal line — this
+    // pre-truncation is what keeps what Ink receives short and safe
+    const long = 'x'.repeat(300)
+    const result = truncateDisplay(long, 50)
+    expect(result).toHaveLength(50)
+  })
+
+  it('is CJK-width aware, matching wrapText', () => {
+    expect(truncateDisplay('가나다라마바사아자차', 10)).toBe('가나다라마')
   })
 })

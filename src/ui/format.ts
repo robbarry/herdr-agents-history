@@ -30,7 +30,7 @@ function charWidth(ch: string): number {
   return WIDE_CHAR.test(ch) || EMOJI.test(ch) ? 2 : 1
 }
 
-function displayWidth(text: string): number {
+export function displayWidth(text: string): number {
   return [...text].reduce((sum, ch) => sum + charWidth(ch), 0)
 }
 
@@ -49,6 +49,17 @@ export function padDisplay(text: string, width: number): string {
 export function wrapText(text: string, width: number): string[] {
   if (width <= 0) return text.split('\n')
   return text.split('\n').flatMap((line) => wrapLine(line, width))
+}
+
+/**
+ * Truncate to a display width, character-aware (CJK counted as 2 columns).
+ * Prefer this over Ink's own `wrap="truncate"` for long assembled strings —
+ * a very long single-line Text (200+ chars) has been observed to make Ink
+ * miscompute the row's height, bleeding the next row's content onto the
+ * same terminal line. Pre-truncating keeps what Ink receives short and safe.
+ */
+export function truncateDisplay(text: string, width: number): string {
+  return wrapText(text, width)[0] ?? ''
 }
 
 function wrapLine(line: string, width: number): string[] {
