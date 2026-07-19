@@ -1,4 +1,4 @@
-import type { ParsedToolCall } from '../../types.js'
+import type { ParsedOutput, ParsedToolCall } from '../../types.js'
 
 function pickDetail(input: Record<string, unknown>): string {
   const candidates = [
@@ -72,8 +72,44 @@ export function parseClaudeLine(line: string): ParsedToolCall[] {
         kind: 'tool',
         tool: b['name'],
         detail: pickDetail(input),
-        raw: JSON.stringify(input, null, 2).slice(0, 4_000)
+        raw: JSON.stringify(input, null, 2).slice(0, 4_000),
+        toolUseId: typeof b['id'] === 'string' ? b['id'] : undefined
       }
     ]
+  })
+}
+
+/** Extract a tool_result's content, whether it's a plain string or a content-block array. */
+function extractResultText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content
+    .filter((b): b is Record<string, unknown> => typeof b === 'object' && b !== null)
+    .filter((b) => b['type'] === 'text' && typeof b['text'] === 'string')
+    .map((b) => b['text'] as string)
+    .join('\n')
+}
+
+/** Parse a transcript line for its tool_result(s), correlated to the originating call by toolUseId. */
+export function parseClaudeOutputLine(line: string): ParsedOutput[] {
+  let record: unknown
+  try {
+    record = JSON.parse(line)
+  } catch {
+    return []
+  }
+  if (typeof record !== 'object' || record === null) return []
+  const rec = record as Record<string, unknown>
+  if (rec['type'] !== 'user') return []
+  const content = (rec['message'] as Record<string, unknown> | undefined)?.['content']
+  if (!Array.isArray(content)) return []
+  const ts = typeof rec['timestamp'] === 'string' ? rec['timestamp'] : ''
+
+  return content.flatMap((block) => {
+    if (typeof block !== 'object' || block === null) return []
+    const b = block as Record<string, unknown>
+    if (b['type'] !== 'tool_result' || typeof b['tool_use_id'] !== 'string') return []
+    const output = extractResultText(b['content']).slice(0, 4_000)
+    return output.length > 0 ? [{ ts, toolUseId: b['tool_use_id'], output }] : []
   })
 }

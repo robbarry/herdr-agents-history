@@ -25,12 +25,27 @@ function group(event: ToolEvent, count = 1): FeedGroup {
 const NOW = new Date('2026-07-17T13:00:00Z')
 
 describe('computeInspectLayout', () => {
-  it('wraps raw content to the content width and fits without an indicator when it fits', () => {
+  it('wraps input to the content width and fits without an indicator when it fits', () => {
     const event = toolEvent({ raw: 'a short input' })
     const layout = computeInspectLayout(group(event), [], 80, 30, NOW)
-    expect(layout.rawLines).toEqual(['a short input'])
-    // plenty of room: rawAreaHeight should equal the naive remaining height (no reserved indicator row)
-    expect(layout.rawAreaHeight).toBe(30 - layout.headerLines)
+    expect(layout.bodyLines.map((l) => l.text)).toEqual(['input:', 'a short input'])
+    expect(layout.bodyLines[0].isLabel).toBe(true)
+    expect(layout.bodyLines[1].isLabel).toBe(false)
+    // plenty of room: bodyAreaHeight should equal the naive remaining height (no reserved indicator row)
+    expect(layout.bodyAreaHeight).toBe(30 - layout.headerLines)
+  })
+
+  it('appends output after input as one unified scrollable body, with its own label', () => {
+    const event = toolEvent({ raw: 'the input' })
+    const layout = computeInspectLayout(group(event), [], 80, 30, NOW, 'the output')
+    expect(layout.bodyLines.map((l) => l.text)).toEqual(['input:', 'the input', '', 'output:', 'the output'])
+    expect(layout.bodyLines.filter((l) => l.isLabel).map((l) => l.text)).toEqual(['input:', 'output:'])
+  })
+
+  it('shows output on its own even when there is no input to precede it', () => {
+    const event = toolEvent({ raw: undefined })
+    const layout = computeInspectLayout(group(event), [], 80, 30, NOW, 'solo output')
+    expect(layout.bodyLines.map((l) => l.text)).toEqual(['output:', 'solo output'])
   })
 
   it('reserves one row for the "more" indicator only when scrolling is actually needed', () => {
@@ -38,11 +53,11 @@ describe('computeInspectLayout', () => {
     const event = toolEvent({ raw })
     const height = 20
     const layout = computeInspectLayout(group(event), [], 80, height, NOW)
-    expect(layout.rawLines).toHaveLength(50)
-    // naive height would be height-headerLines; since 50 lines overflow that,
+    expect(layout.bodyLines).toHaveLength(51) // 'input:' label + 50 lines
+    // naive height would be height-headerLines; since the body overflows that,
     // one row must be reserved for the indicator
     const naive = height - layout.headerLines
-    expect(layout.rawAreaHeight).toBe(naive - 1)
+    expect(layout.bodyAreaHeight).toBe(naive - 1)
   })
 
   it('accounts for the constituents list and detail row in headerLines', () => {
@@ -61,26 +76,30 @@ describe('computeInspectLayout', () => {
     const height = 2
     const event = toolEvent({ raw: 'x'.repeat(5000) })
     const layout = computeInspectLayout(group(event), [], 80, height, NOW)
-    expect(layout.rawAreaHeight).toBe(0)
+    expect(layout.bodyAreaHeight).toBe(0)
     // header + content rows + the 1 reserved indicator row must never exceed the given height
-    expect(layout.headerLines + layout.rawAreaHeight + 1).toBeLessThanOrEqual(Math.max(height, layout.headerLines + 1))
+    expect(layout.headerLines + layout.bodyAreaHeight + 1).toBeLessThanOrEqual(Math.max(height, layout.headerLines + 1))
   })
 
-  it('never lets rawAreaHeight go negative', () => {
+  it('never lets bodyAreaHeight go negative', () => {
     const event = toolEvent({ raw: 'x'.repeat(5000) })
     const layout = computeInspectLayout(group(event), [], 80, 1, NOW)
-    expect(layout.rawAreaHeight).toBeGreaterThanOrEqual(0)
+    expect(layout.bodyAreaHeight).toBeGreaterThanOrEqual(0)
   })
 
-  it('reproduces the exact tight-space case observed in the running plugin: 12 header rows in a 13-row body', () => {
-    // 3 collapsed calls + a detail row + raw content — this combination used
-    // to force rawAreaHeight back up to 1 even though only 1 row of budget
-    // remained after the header, overflowing the container by one row.
+  it('reproduces the tight-space case observed in the running plugin: 3 collapsed calls + detail + input in a 13-row body', () => {
+    // 3 collapsed calls + a detail row + input — this combination used to
+    // force the raw content area back up to 1 row even though the header
+    // left no budget for it, overflowing the container by one row.
     const collapsed = toolEvent({ id: 3, raw: Array.from({ length: 5 }, (_, i) => `line ${i}`).join('\n') })
     const constituents = [toolEvent({ id: 1 }), toolEvent({ id: 2 }), collapsed]
     const layout = computeInspectLayout(group(collapsed, 3), constituents, 100, 13, NOW)
-    expect(layout.headerLines).toBe(12)
-    expect(layout.rawAreaHeight).toBe(0)
+    expect(layout.headerLines).toBe(11)
+    // whatever bodyAreaHeight comes out to, the total must never exceed the
+    // given height (this is the invariant the original bug violated)
+    const needsIndicator = layout.bodyLines.length > layout.bodyAreaHeight
+    const total = layout.headerLines + layout.bodyAreaHeight + (needsIndicator ? 1 : 0)
+    expect(total).toBeLessThanOrEqual(13)
   })
 
   it('wraps a long detail (a full shell command) instead of truncating it with an ellipsis', () => {
@@ -100,5 +119,14 @@ describe('computeInspectLayout', () => {
     expect(layout.constituentOverflow).toBe(2)
     expect(layout.constituentPreviews[0].lines.join('')).toBe(longCommand)
     expect(layout.constituentPreviews[0].lines.length).toBeGreaterThan(1)
+  })
+
+  it('wraps a long output instead of truncating it', () => {
+    const longOutput = Array.from({ length: 40 }, (_, i) => `output line ${i}`).join('\n')
+    const event = toolEvent({ raw: 'cmd' })
+    const layout = computeInspectLayout(group(event), [], 80, 15, NOW, longOutput)
+    const outputStart = layout.bodyLines.findIndex((l) => l.text === 'output:')
+    expect(outputStart).toBeGreaterThan(-1)
+    expect(layout.bodyLines.slice(outputStart + 1).map((l) => l.text)).toEqual(longOutput.split('\n'))
   })
 })

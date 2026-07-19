@@ -11,7 +11,9 @@ interface Props {
   readonly group: FeedGroup | null
   readonly constituents: ToolEvent[]
   readonly agent: AgentSnapshot | null
-  /** lines scrolled down from the top of the raw content (0 = start) */
+  /** the call's result, if it has arrived yet (looked up by toolUseId) */
+  readonly output?: string
+  /** lines scrolled down from the top of the input/output body (0 = start) */
   readonly scrollOffset: number
   readonly width: number
   readonly height: number
@@ -31,7 +33,7 @@ function Row({ label, children }: { readonly label: string; readonly children: R
   )
 }
 
-export function Inspect({ group, constituents, agent, scrollOffset, width, height, now }: Props) {
+export function Inspect({ group, constituents, agent, output, scrollOffset, width, height, now }: Props) {
   if (!group) {
     return (
       <Box height={height} justifyContent="center" alignItems="center">
@@ -49,15 +51,16 @@ export function Inspect({ group, constituents, agent, scrollOffset, width, heigh
       ? `${formatTime(constituents[0].ts, now).trim()} ~ ${formatTime(event.ts, now).trim()} (×${count})`
       : formatTime(event.ts, now).trim()
 
-  const { detailLines, constituentPreviews, constituentOverflow, rawLines, rawAreaHeight } = computeInspectLayout(
+  const { detailLines, constituentPreviews, constituentOverflow, bodyLines, bodyAreaHeight } = computeInspectLayout(
     group,
     constituents,
     width,
     height,
-    now
+    now,
+    output
   )
-  const visibleRaw = rawLines.slice(scrollOffset, scrollOffset + rawAreaHeight)
-  const moreBelow = rawLines.length - (scrollOffset + visibleRaw.length)
+  const visibleBody = bodyLines.slice(scrollOffset, scrollOffset + bodyAreaHeight)
+  const moreBelow = bodyLines.length - (scrollOffset + visibleBody.length)
 
   return (
     <Box flexDirection="column" paddingX={2} height={height} overflow="hidden">
@@ -110,37 +113,27 @@ export function Inspect({ group, constituents, agent, scrollOffset, width, heigh
             {constituentOverflow > 0 ? <Text dimColor>  … 외 {constituentOverflow}회</Text> : null}
           </>
         ) : null}
-        {event.raw ? (
-          <>
-            {divider}
-            <Text dimColor>
-              {isTurn ? 'prompt 전문:' : 'input:'}
-              {rawLines.length > rawAreaHeight ? (
-                <Text dimColor>
-                  {' '}
-                  ({Math.min(scrollOffset + rawAreaHeight, rawLines.length)}/{rawLines.length} 줄)
-                </Text>
-              ) : null}
-            </Text>
-          </>
-        ) : null}
+        {bodyLines.length > 0 ? divider : null}
       </Box>
-      {event.raw && rawAreaHeight > 0 ? (
+      {bodyAreaHeight > 0 ? (
         <Box flexDirection="row" flexGrow={1} flexShrink={1} overflow="hidden">
           <Box flexDirection="column" flexGrow={1} flexShrink={1}>
-            {visibleRaw.map((line, i) => (
-              <Text key={scrollOffset + i} dimColor={!isTurn} wrap="truncate">
-                {line || ' '}
+            {visibleBody.map((line, i) => (
+              <Text key={scrollOffset + i} dimColor={!line.isLabel} bold={line.isLabel} wrap="truncate">
+                {line.text || ' '}
               </Text>
             ))}
           </Box>
           <Box flexShrink={0} marginLeft={1}>
-            <Scrollbar total={rawLines.length} start={scrollOffset} height={visibleRaw.length} />
+            <Scrollbar total={bodyLines.length} start={scrollOffset} height={visibleBody.length} />
           </Box>
         </Box>
       ) : null}
-      {event.raw && moreBelow > 0 ? (
-        <Text dimColor>  ↓ {moreBelow}줄 더 <Text color="cyan">· [j/k] 스크롤 [g/G] 처음/끝</Text></Text>
+      {moreBelow > 0 ? (
+        <Text dimColor>
+          {' '}
+          ↓ {moreBelow}줄 더 <Text color="cyan">· [j/k] 스크롤 [g/G] 처음/끝</Text>
+        </Text>
       ) : null}
     </Box>
   )

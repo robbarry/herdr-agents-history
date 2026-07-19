@@ -50,9 +50,14 @@ export function App() {
   const [feedWindowAnchor, setFeedWindowAnchor] = useState<number | null>(null)
   const frozen = useRef<ToolEvent[] | null>(null)
   const stats = useRef(new StatsStore())
+  // held in a ref (not state) so Inspect can query getOutput() during render;
+  // outputs arrive out-of-band from the tool-call events and don't need their
+  // own re-render trigger — the once-a-second clock tick already covers it
+  const collectorRef = useRef<Collector | null>(null)
 
   useEffect(() => {
     const collector = new Collector()
+    collectorRef.current = collector
     const reporter = getConfig().badge ? new BadgeReporter(stats.current) : null
     const onEvents = (batch: ToolEvent[]) => {
       for (const event of batch) if (event.kind === 'tool') stats.current.add(event)
@@ -71,6 +76,7 @@ export function App() {
       clearInterval(clock)
       collector.stop()
       reporter?.stop()
+      collectorRef.current = null
     }
   }, [])
 
@@ -101,8 +107,11 @@ export function App() {
       (e) => e.id >= g.firstId && e.id <= g.event.id && e.agentKey === g.event.agentKey && e.tool === g.event.tool && e.kind === g.event.kind
     )
   }, [inspectGroup, visible])
-  const inspectLayout = inspectGroup ? computeInspectLayout(inspectGroup, inspectConstituents, columns, bodyHeight, now) : null
-  const inspectMaxScroll = inspectLayout ? Math.max(inspectLayout.rawLines.length - inspectLayout.rawAreaHeight, 0) : 0
+  const inspectOutput = collectorRef.current?.getOutput(inspectGroup?.event.toolUseId)
+  const inspectLayout = inspectGroup
+    ? computeInspectLayout(inspectGroup, inspectConstituents, columns, bodyHeight, now, inspectOutput)
+    : null
+  const inspectMaxScroll = inspectLayout ? Math.max(inspectLayout.bodyLines.length - inspectLayout.bodyAreaHeight, 0) : 0
 
   useInput((input, key) => {
     if (filterMode) {
@@ -173,7 +182,7 @@ export function App() {
     }
 
     if (view.kind === 'inspect') {
-      const pageSize = Math.max((inspectLayout?.rawAreaHeight ?? 1) - 1, 1)
+      const pageSize = Math.max((inspectLayout?.bodyAreaHeight ?? 1) - 1, 1)
       if (key.escape || key.return || key.tab) setView({ kind: 'feed' })
       else if (input === 'j' || key.downArrow) setInspectScroll((prev) => Math.min(prev + 1, inspectMaxScroll))
       else if (input === 'k' || key.upArrow) setInspectScroll((prev) => Math.max(prev - 1, 0))
@@ -231,6 +240,7 @@ export function App() {
           group={inspectGroup}
           constituents={inspectConstituents}
           agent={agents.find((a) => a.key === inspectGroup?.event.agentKey) ?? null}
+          output={inspectOutput}
           scrollOffset={inspectScroll}
           width={columns}
           height={bodyHeight}

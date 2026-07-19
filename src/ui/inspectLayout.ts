@@ -10,6 +10,12 @@ export interface ConstituentPreview {
   readonly lines: string[]
 }
 
+export interface BodyLine {
+  readonly text: string
+  /** section headings ("input:", "output:", "prompt 전문:") get distinct styling */
+  readonly isLabel: boolean
+}
+
 export interface InspectLayout {
   /** rows consumed by the fixed header (title, meta, constituents list) */
   readonly headerLines: number
@@ -19,10 +25,10 @@ export interface InspectLayout {
   readonly constituentPreviews: ConstituentPreview[]
   /** count of older constituents beyond what constituentPreviews shows */
   readonly constituentOverflow: number
-  /** the raw content (tool input / prompt), pre-wrapped to the content width */
-  readonly rawLines: string[]
-  /** remaining rows available for scrolling through rawLines */
-  readonly rawAreaHeight: number
+  /** tool input and, once available, its output — one unified scrollable region */
+  readonly bodyLines: BodyLine[]
+  /** remaining rows available for scrolling through bodyLines */
+  readonly bodyAreaHeight: number
 }
 
 const CONSTITUENTS_SHOWN = 8
@@ -30,20 +36,26 @@ const LABEL_WIDTH = 10
 /** formatTime always returns exactly 11 chars, plus 2 literal spaces after it */
 const TIME_PREFIX_WIDTH = 13
 
+function textLines(lines: string[]): BodyLine[] {
+  return lines.map((text) => ({ text, isLabel: false }))
+}
+
 /**
  * Line-accounting for the Inspect view, shared by the App (to clamp scroll
  * bounds) and the Inspect component (to actually render) so the two can
  * never drift out of sync. Long text (a full shell command, a wide detail
- * string) is wrapped here — not truncated with an ellipsis — so nothing is
- * ever hidden; every wrapped line is counted into headerLines so the raw
- * content area below is sized correctly and never overflows the container.
+ * string, tool input/output) is wrapped here — not truncated with an
+ * ellipsis — so nothing is ever hidden; every wrapped line is counted into
+ * headerLines/bodyAreaHeight so the layout is sized correctly and never
+ * overflows the container.
  */
 export function computeInspectLayout(
   group: FeedGroup,
   constituents: readonly ToolEvent[],
   width: number,
   height: number,
-  now: Date
+  now: Date,
+  output?: string
 ): InspectLayout {
   const { event, count } = group
   const isTurn = event.kind === 'turn'
@@ -72,20 +84,34 @@ export function computeInspectLayout(
     if (constituentOverflow > 0) headerLines += 1
   }
 
-  if (event.raw) headerLines += 2 // divider + "input:"/"prompt 전문:" label
-
-  const rawLines = event.raw ? wrapText(event.raw, contentWidth) : []
+  // input and output share one scrollable region, each introduced by its own
+  // label line — this keeps a single scrollbar/indicator instead of two
+  const bodyLines: BodyLine[] = []
+  if (event.raw) {
+    bodyLines.push({ text: isTurn ? 'prompt 전문:' : 'input:', isLabel: true })
+    bodyLines.push(...textLines(wrapText(event.raw, contentWidth)))
+  }
+  if (output && output.length > 0) {
+    if (bodyLines.length > 0) bodyLines.push({ text: '', isLabel: false })
+    bodyLines.push({ text: 'output:', isLabel: true })
+    bodyLines.push(...textLines(wrapText(output, contentWidth)))
+  }
+  if (bodyLines.length > 0) headerLines += 1 // one divider before the scrollable body
 
   // reserve one row for the "N more lines" indicator, but only when it's
   // actually needed — otherwise scrolling never engages and the reservation
   // would just leave a dead blank line at the bottom. When space is so tight
-  // that even the indicator barely fits, rawAreaHeight degrades to 0 (content
+  // that even the indicator barely fits, bodyAreaHeight degrades to 0 (content
   // rows disappear, only the indicator shows) rather than overflowing the
-  // container — the total (headerLines + rawAreaHeight + indicator row) must
-  // never exceed `height`, so this must not be floored back up to 1.
-  const naiveHeight = Math.max(height - headerLines, 1)
-  const needsIndicator = rawLines.length > naiveHeight
-  const rawAreaHeight = needsIndicator ? naiveHeight - 1 : naiveHeight
+  // container — the total (headerLines + bodyAreaHeight + indicator row) must
+  // never exceed `height`, so naiveHeight must NOT be floored up to 1: with a
+  // header this tall (e.g. many collapsed constituents), height - headerLines
+  // can legitimately be 0 or negative, and forcing it to 1 pushed the total
+  // one row past `height`, bleeding into whatever renders below (the app
+  // footer) — a real bug this floor caused and that these tests guard against.
+  const naiveHeight = Math.max(height - headerLines, 0)
+  const needsIndicator = naiveHeight > 0 && bodyLines.length > naiveHeight
+  const bodyAreaHeight = needsIndicator ? naiveHeight - 1 : naiveHeight
 
-  return { headerLines, detailLines, constituentPreviews, constituentOverflow, rawLines, rawAreaHeight }
+  return { headerLines, detailLines, constituentPreviews, constituentOverflow, bodyLines, bodyAreaHeight }
 }

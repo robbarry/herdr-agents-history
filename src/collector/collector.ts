@@ -1,19 +1,27 @@
 import { EventEmitter } from 'node:events'
 import path from 'node:path'
-import type { AgentSnapshot, ParsedToolCall, ToolEvent } from '../types.js'
-import { parseClaudeLine } from './adapters/claude.js'
-import { parseCodexLine } from './adapters/codex.js'
+import type { AgentSnapshot, ParsedOutput, ParsedToolCall, ToolEvent } from '../types.js'
+import { parseClaudeLine, parseClaudeOutputLine } from './adapters/claude.js'
+import { parseCodexLine, parseCodexOutputLine } from './adapters/codex.js'
 import { listHerdrAgents } from './herdr.js'
 import { SessionCache, defaultStateDir, resolveTranscript } from './sessions.js'
 import { TranscriptTailer } from './tailer.js'
 
 const AGENT_POLL_MS = 5_000
+/** caps memory for long-running sessions; oldest outputs are evicted first (Map preserves insertion order) */
+const OUTPUTS_LIMIT = 2_000
 
 type LineParser = (line: string) => ParsedToolCall[]
+type OutputParser = (line: string) => ParsedOutput[]
 
 const PARSERS: Readonly<Record<string, LineParser>> = {
   claude: parseClaudeLine,
   codex: parseCodexLine
+}
+
+const OUTPUT_PARSERS: Readonly<Record<string, OutputParser>> = {
+  claude: parseClaudeOutputLine,
+  codex: parseCodexOutputLine
 }
 
 interface TrackedAgent {
@@ -33,6 +41,7 @@ export class Collector extends EventEmitter {
   private pollTimer: NodeJS.Timeout | null = null
   private nextEventId = 1
   private stopped = false
+  private readonly outputs = new Map<string, string>()
 
   start(): void {
     void this.sync()
@@ -99,12 +108,28 @@ export class Collector extends EventEmitter {
     if (!transcript || this.stopped) return null
 
     const parse = PARSERS[snapshot.kind]
+    const parseOutput = OUTPUT_PARSERS[snapshot.kind]
     const tailer = new TranscriptTailer(transcript, (lines, backfill) => {
       const events = lines.flatMap((line) => parse(line).map((call) => this.makeEvent(snapshot, call, backfill)))
       if (events.length > 0) this.emit('events', events)
+      lines.forEach((line) => parseOutput(line).forEach((o) => this.recordOutput(o)))
     })
     void tailer.start()
     return tailer
+  }
+
+  private recordOutput(output: ParsedOutput): void {
+    this.outputs.delete(output.toolUseId) // re-insert at the end so eviction stays LRU-ish
+    this.outputs.set(output.toolUseId, output.output)
+    if (this.outputs.size > OUTPUTS_LIMIT) {
+      const oldest = this.outputs.keys().next().value
+      if (oldest !== undefined) this.outputs.delete(oldest)
+    }
+  }
+
+  /** The result text for a tool call, if its output has arrived yet. */
+  getOutput(toolUseId: string | undefined): string | undefined {
+    return toolUseId ? this.outputs.get(toolUseId) : undefined
   }
 
   private makeEvent(snapshot: AgentSnapshot, call: ParsedToolCall, backfill: boolean): ToolEvent {
@@ -119,6 +144,7 @@ export class Collector extends EventEmitter {
       tool: call.tool,
       detail: call.detail.replace(/\s+/g, ' ').trim(),
       raw: call.raw,
+      toolUseId: call.toolUseId,
       backfill
     }
   }

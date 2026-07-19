@@ -10,6 +10,8 @@ export interface ToolEvent {
   readonly detail: string
   /** full tool input (pretty JSON) or full prompt — shown in the inspect view */
   readonly raw?: string
+  /** correlation id for matching this call to its result (claude: tool_use.id, codex: call_id) */
+  readonly toolUseId?: string
   readonly backfill: boolean
 }
 
@@ -29,4 +31,12 @@ export interface ParsedToolCall {
   readonly tool: string
   readonly detail: string
   readonly raw?: string
+  readonly toolUseId?: string
+}
+
+/** A tool's result, parsed separately from its call and correlated by toolUseId. */
+export interface ParsedOutput {
+  readonly ts: string
+  readonly toolUseId: string
+  readonly output: string
 }

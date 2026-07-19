@@ -1,4 +1,4 @@
-import type { ParsedToolCall } from '../../types.js'
+import type { ParsedOutput, ParsedToolCall } from '../../types.js'
 
 const TOOL_CALL_TYPES = new Set(['function_call', 'custom_tool_call', 'tool_search_call'])
 
@@ -50,5 +50,26 @@ export function parseCodexLine(line: string): ParsedToolCall[] {
   const args = p['arguments'] ?? p['input']
   const detail = parseArguments(args)
   const raw = typeof args === 'string' ? prettyJson(args).slice(0, 4_000) : undefined
-  return [{ ts, kind: 'tool', tool, detail, raw }]
+  const toolUseId = typeof p['call_id'] === 'string' ? p['call_id'] : undefined
+  return [{ ts, kind: 'tool', tool, detail, raw, toolUseId }]
+}
+
+/** Parse a rollout line for a function_call_output, correlated to its call by call_id. */
+export function parseCodexOutputLine(line: string): ParsedOutput[] {
+  let record: unknown
+  try {
+    record = JSON.parse(line)
+  } catch {
+    return []
+  }
+  if (typeof record !== 'object' || record === null) return []
+  const rec = record as Record<string, unknown>
+  const payload = rec['payload']
+  if (typeof payload !== 'object' || payload === null) return []
+  const p = payload as Record<string, unknown>
+  if (p['type'] !== 'function_call_output') return []
+  if (typeof p['call_id'] !== 'string' || typeof p['output'] !== 'string') return []
+  const ts = typeof rec['timestamp'] === 'string' ? rec['timestamp'] : ''
+  const output = p['output'].slice(0, 4_000)
+  return output.length > 0 ? [{ ts, toolUseId: p['call_id'], output }] : []
 }
