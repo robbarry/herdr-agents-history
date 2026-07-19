@@ -13,14 +13,15 @@ interface Props {
   readonly agent: AgentSnapshot | null
   /** the call's result, if it has arrived yet (looked up by toolUseId) */
   readonly output?: string
-  /** lines scrolled down from the top of the input/output body (0 = start) */
+  /** rows scrolled down from the very top of the view (0 = start) — the whole
+   *  view (title through input/output) scrolls together as one region */
   readonly scrollOffset: number
   readonly width: number
   readonly height: number
   readonly now: Date
 }
 
-function Row({ label, children }: { readonly label: string; readonly children: ReactNode }) {
+function metaRow(label: string, children: ReactNode): ReactNode {
   return (
     <Box>
       <Box flexShrink={0}>
@@ -45,90 +46,116 @@ export function Inspect({ group, constituents, agent, output, scrollOffset, widt
   const { event, count } = group
   const isTurn = event.kind === 'turn'
   const style = toolStyle(event.tool)
-  const divider = <Text dimColor>{'─'.repeat(Math.max(width - 4, 1))}</Text>
+  // -4 for paddingX(2)*2, -2 for the scrollbar gutter shared with every other
+  // row now that dividers live inside the same scrollable column — without
+  // matching that budget exactly, Ink's default word-wrap breaks this onto a
+  // second physical line, desyncing the row-index accounting for everything
+  // that scrolls below it. wrap="truncate" is a safety net, not the fix.
+  const dividerText = '─'.repeat(Math.max(width - 4 - 2, 1))
+  const divider = (
+    <Text dimColor wrap="truncate">
+      {dividerText}
+    </Text>
+  )
   const timeLabel =
     count > 1 && constituents.length > 0
       ? `${formatTime(constituents[0].ts, now).trim()} ~ ${formatTime(event.ts, now).trim()} (×${count})`
       : formatTime(event.ts, now).trim()
 
-  const { detailLines, constituentPreviews, constituentOverflow, bodyLines, bodyAreaHeight } = computeInspectLayout(
-    group,
-    constituents,
-    width,
-    height,
-    now,
-    output
+  const { detailLines, constituentPreviews, constituentOverflow, bodyLines, totalLines, visibleHeight } =
+    computeInspectLayout(group, constituents, width, height, now, output)
+
+  // one row per line of the whole view, in the same order computeInspectLayout
+  // counted them — keeping totalLines and this array in lockstep is what lets
+  // the whole thing (not just input/output) scroll as one region
+  const rows: ReactNode[] = []
+  rows.push(
+    <Text bold wrap="truncate" key="title">
+      {isTurn ? '❯ 대화 턴' : `${style.icon} ${event.tool}`}
+      <Text dimColor> · 자세히 보기</Text>
+    </Text>
   )
-  const visibleBody = bodyLines.slice(scrollOffset, scrollOffset + bodyAreaHeight)
-  const moreBelow = bodyLines.length - (scrollOffset + visibleBody.length)
+  rows.push(<Box key="divider-top">{divider}</Box>)
+  rows.push(
+    <Box key="agent">
+      {metaRow(
+        'agent',
+        <Text wrap="truncate">
+          <Text color={agentColor(event.agentKey)}>{event.agentLabel}</Text>
+          <Text dimColor>
+            {' '}
+            ({event.agentKind}){agent ? ` · ${STATUS_ICON[agent.status] ?? '?'} ${agent.status}` : ''}
+          </Text>
+        </Text>
+      )}
+    </Box>
+  )
+  rows.push(
+    <Box key="time">
+      {metaRow('time', <Text wrap="truncate">{timeLabel}</Text>)}
+    </Box>
+  )
+  detailLines.forEach((line, i) => {
+    rows.push(
+      <Box key={`detail-${i}`}>
+        <Box flexShrink={0}>
+          <Text dimColor>{padDisplay(i === 0 ? 'detail' : '', 10)}</Text>
+        </Box>
+        <Box flexGrow={1} flexShrink={1}>
+          <Text wrap="truncate">{line}</Text>
+        </Box>
+      </Box>
+    )
+  })
+  if (count > 1) {
+    rows.push(<Box key="divider-constituents">{divider}</Box>)
+    rows.push(
+      <Text dimColor wrap="truncate" key="constituents-label">
+        연속 호출 {count}회:
+      </Text>
+    )
+    constituentPreviews.forEach((preview) => {
+      preview.lines.forEach((line, i) => {
+        rows.push(
+          <Text key={`constituent-${preview.id}-${i}`} wrap="truncate">
+            <Text dimColor>{i === 0 ? `${preview.time}  ` : ' '.repeat(13)}</Text>
+            <Text>{line}</Text>
+          </Text>
+        )
+      })
+    })
+    if (constituentOverflow > 0) {
+      rows.push(
+        <Text dimColor wrap="truncate" key="constituents-overflow">
+          {'  '}… 외 {constituentOverflow}회
+        </Text>
+      )
+    }
+  }
+  if (bodyLines.length > 0) {
+    rows.push(<Box key="divider-body">{divider}</Box>)
+    bodyLines.forEach((line, i) => {
+      rows.push(
+        <Text key={`body-${i}`} dimColor={!line.isLabel} bold={line.isLabel} wrap="truncate">
+          {line.text || ' '}
+        </Text>
+      )
+    })
+  }
+
+  const visibleRows = rows.slice(scrollOffset, scrollOffset + visibleHeight)
+  const moreBelow = totalLines - (scrollOffset + visibleRows.length)
 
   return (
     <Box flexDirection="column" paddingX={2} height={height} overflow="hidden">
-      <Box flexDirection="column" flexShrink={0}>
-        <Text bold>
-          {isTurn ? '❯ 대화 턴' : `${style.icon} ${event.tool}`}
-          <Text dimColor> · 자세히 보기</Text>
-        </Text>
-        {divider}
-        <Row label="agent">
-          <Text>
-            <Text color={agentColor(event.agentKey)}>{event.agentLabel}</Text>
-            <Text dimColor>
-              {' '}
-              ({event.agentKind}){agent ? ` · ${STATUS_ICON[agent.status] ?? '?'} ${agent.status}` : ''}
-            </Text>
-          </Text>
-        </Row>
-        <Row label="time">
-          <Text>{timeLabel}</Text>
-        </Row>
-        {detailLines.length > 0 ? (
-          <Box flexDirection="column">
-            {detailLines.map((line, i) => (
-              <Box key={i}>
-                <Box flexShrink={0}>
-                  <Text dimColor>{padDisplay(i === 0 ? 'detail' : '', 10)}</Text>
-                </Box>
-                <Box flexGrow={1} flexShrink={1}>
-                  <Text wrap="truncate">{line}</Text>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        ) : null}
-        {count > 1 ? (
-          <>
-            {divider}
-            <Text dimColor>연속 호출 {count}회:</Text>
-            {constituentPreviews.map((preview) => (
-              <Box key={preview.id} flexDirection="column">
-                {preview.lines.map((line, i) => (
-                  <Text key={i} wrap="truncate">
-                    <Text dimColor>{i === 0 ? `${preview.time}  ` : ' '.repeat(13)}</Text>
-                    <Text>{line}</Text>
-                  </Text>
-                ))}
-              </Box>
-            ))}
-            {constituentOverflow > 0 ? <Text dimColor>  … 외 {constituentOverflow}회</Text> : null}
-          </>
-        ) : null}
-        {bodyLines.length > 0 ? divider : null}
-      </Box>
-      {bodyAreaHeight > 0 ? (
-        <Box flexDirection="row" flexGrow={1} flexShrink={1} overflow="hidden">
-          <Box flexDirection="column" flexGrow={1} flexShrink={1}>
-            {visibleBody.map((line, i) => (
-              <Text key={scrollOffset + i} dimColor={!line.isLabel} bold={line.isLabel} wrap="truncate">
-                {line.text || ' '}
-              </Text>
-            ))}
-          </Box>
-          <Box flexShrink={0} marginLeft={1}>
-            <Scrollbar total={bodyLines.length} start={scrollOffset} height={visibleBody.length} />
-          </Box>
+      <Box flexDirection="row" flexGrow={1} flexShrink={1} overflow="hidden">
+        <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+          {visibleRows}
         </Box>
-      ) : null}
+        <Box flexShrink={0} marginLeft={1}>
+          <Scrollbar total={totalLines} start={scrollOffset} height={visibleRows.length} />
+        </Box>
+      </Box>
       {moreBelow > 0 ? (
         <Text dimColor>
           {' '}

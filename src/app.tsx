@@ -111,7 +111,7 @@ export function App() {
   const inspectLayout = inspectGroup
     ? computeInspectLayout(inspectGroup, inspectConstituents, columns, bodyHeight, now, inspectOutput)
     : null
-  const inspectMaxScroll = inspectLayout ? Math.max(inspectLayout.bodyLines.length - inspectLayout.bodyAreaHeight, 0) : 0
+  const inspectMaxScroll = inspectLayout ? Math.max(inspectLayout.totalLines - inspectLayout.visibleHeight, 0) : 0
 
   useInput((input, key) => {
     if (filterMode) {
@@ -182,7 +182,7 @@ export function App() {
     }
 
     if (view.kind === 'inspect') {
-      const pageSize = Math.max((inspectLayout?.bodyAreaHeight ?? 1) - 1, 1)
+      const pageSize = Math.max((inspectLayout?.visibleHeight ?? 1) - 1, 1)
       if (key.escape || key.return || key.tab) setView({ kind: 'feed' })
       else if (input === 'j' || key.downArrow) setInspectScroll((prev) => Math.min(prev + 1, inspectMaxScroll))
       else if (input === 'k' || key.upArrow) setInspectScroll((prev) => Math.max(prev - 1, 0))

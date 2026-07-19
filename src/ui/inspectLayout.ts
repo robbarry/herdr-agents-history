@@ -17,7 +17,7 @@ export interface BodyLine {
 }
 
 export interface InspectLayout {
-  /** rows consumed by the fixed header (title, meta, constituents list) */
+  /** rows consumed by title/meta/constituents — used to size the header before bodyLines */
   readonly headerLines: number
   /** the "detail" field, wrapped to the row's content width (empty if not shown) */
   readonly detailLines: string[]
@@ -25,10 +25,12 @@ export interface InspectLayout {
   readonly constituentPreviews: ConstituentPreview[]
   /** count of older constituents beyond what constituentPreviews shows */
   readonly constituentOverflow: number
-  /** tool input and, once available, its output — one unified scrollable region */
+  /** tool input and, once available, its output */
   readonly bodyLines: BodyLine[]
-  /** remaining rows available for scrolling through bodyLines */
-  readonly bodyAreaHeight: number
+  /** headerLines + bodyLines.length — the view's full row count before windowing */
+  readonly totalLines: number
+  /** rows actually visible at once (whole view scrolls together, not just the body) */
+  readonly visibleHeight: number
 }
 
 const CONSTITUENTS_SHOWN = 8
@@ -45,9 +47,11 @@ function textLines(lines: string[]): BodyLine[] {
  * bounds) and the Inspect component (to actually render) so the two can
  * never drift out of sync. Long text (a full shell command, a wide detail
  * string, tool input/output) is wrapped here — not truncated with an
- * ellipsis — so nothing is ever hidden; every wrapped line is counted into
- * headerLines/bodyAreaHeight so the layout is sized correctly and never
- * overflows the container.
+ * ellipsis — so nothing is ever hidden.
+ *
+ * The whole view scrolls as one unit (title down through input/output) —
+ * there's no separate fixed header, so a call with many collapsed
+ * constituents or a long detail line scrolls away just like the body does.
  */
 export function computeInspectLayout(
   group: FeedGroup,
@@ -84,8 +88,7 @@ export function computeInspectLayout(
     if (constituentOverflow > 0) headerLines += 1
   }
 
-  // input and output share one scrollable region, each introduced by its own
-  // label line — this keeps a single scrollbar/indicator instead of two
+  // input and output share one region, each introduced by its own label line
   const bodyLines: BodyLine[] = []
   if (event.raw) {
     bodyLines.push({ text: isTurn ? 'prompt 전문:' : 'input:', isLabel: true })
@@ -96,22 +99,19 @@ export function computeInspectLayout(
     bodyLines.push({ text: 'output:', isLabel: true })
     bodyLines.push(...textLines(wrapText(output, contentWidth)))
   }
-  if (bodyLines.length > 0) headerLines += 1 // one divider before the scrollable body
+  if (bodyLines.length > 0) headerLines += 1 // one divider before input/output
+
+  const totalLines = headerLines + bodyLines.length
 
   // reserve one row for the "N more lines" indicator, but only when it's
   // actually needed — otherwise scrolling never engages and the reservation
-  // would just leave a dead blank line at the bottom. When space is so tight
-  // that even the indicator barely fits, bodyAreaHeight degrades to 0 (content
-  // rows disappear, only the indicator shows) rather than overflowing the
-  // container — the total (headerLines + bodyAreaHeight + indicator row) must
-  // never exceed `height`, so naiveHeight must NOT be floored up to 1: with a
-  // header this tall (e.g. many collapsed constituents), height - headerLines
-  // can legitimately be 0 or negative, and forcing it to 1 pushed the total
-  // one row past `height`, bleeding into whatever renders below (the app
-  // footer) — a real bug this floor caused and that these tests guard against.
-  const naiveHeight = Math.max(height - headerLines, 0)
-  const needsIndicator = naiveHeight > 0 && bodyLines.length > naiveHeight
-  const bodyAreaHeight = needsIndicator ? naiveHeight - 1 : naiveHeight
+  // would just leave a dead blank line at the bottom. This must not be
+  // floored up to any minimum: with enough collapsed constituents, totalLines
+  // can exceed `height` outright, and forcing extra rows here would push the
+  // total past `height`, bleeding into whatever renders below (the app
+  // footer) — a real bug this kind of floor caused before, guarded by tests.
+  const needsIndicator = totalLines > height
+  const visibleHeight = needsIndicator ? Math.max(height - 1, 0) : height
 
-  return { headerLines, detailLines, constituentPreviews, constituentOverflow, bodyLines, bodyAreaHeight }
+  return { headerLines, detailLines, constituentPreviews, constituentOverflow, bodyLines, totalLines, visibleHeight }
 }
