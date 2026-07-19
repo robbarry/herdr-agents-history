@@ -10,7 +10,7 @@ Supports **Claude Code** and **Codex** sessions out of the box.
 
 ## Views
 
-One pane, four views. `Tab` and single keys move between them.
+One pane, five views. `Tab` and single keys move between them.
 
 ### 📡 Live Feed (default)
 
@@ -28,6 +28,12 @@ Every agent's tool calls as one merged stream — `tail -f` for your whole fleet
 
 Filter with `/` — try `/bash rm` to watch for dangerous commands across every agent at once.
 
+### 🔎 자세히 보기 (Inspect) — `Enter` on any row
+
+Drill into one tool call: the full command/prompt, its complete input, and — once the agent's transcript has it — the actual result (stdout, file content, whatever the tool returned). No more guessing what a truncated feed row actually did. Collapsed `×N` rows also list every constituent call. The whole screen scrolls as one region (`j/k`, `g/G`).
+
+![자세히 보기 — one tool call's full input and output, scrolled as a single region](assets/inspect.png)
+
 ### 🗂 Board
 
 One card per agent: status, an activity sparkline, top tools, last call. Two seconds to know what the whole fleet is up to. Arrow keys / `hjkl` to select, `Enter` to drill down.
@@ -42,11 +48,9 @@ One card per agent: status, an activity sparkline, top tools, last call. Two sec
  ╰─────────────────────────────────────────────╯
 ```
 
-### 🔍 Detail
+### 🔍 Detail — `Enter` on a Board card
 
-One agent's session, reviewable: hourly activity, tool distribution, most-touched files, and a scrollable timeline (`j/k`, `g/G`).
-
-![Detail — one agent's session: activity sparkline, tool distribution, top files, and a scrollable timeline](assets/detail.png)
+One agent's whole session, reviewable: hourly activity, tool distribution, most-touched files, and a scrollable timeline (`j/k`, `g/G`).
 
 ### 🌙 Recap (`r`)
 
@@ -101,7 +105,7 @@ herdr plugin pane open --plugin cdragon.agent-tool-history --entrypoint feed
 
 herdr exposes each pane's native agent **session id**. The plugin resolves that id to the agent's own local transcript (`~/.claude/projects/…/<session>.jsonl`, `~/.codex/sessions/…/rollout-*.jsonl`) and tails it.
 
-- Reads **tool-call metadata only** (tool name, argument summary, timestamp). Prompts and conversation content are never displayed.
+- The Live Feed and Board views show **tool-call metadata only** (tool name, argument summary, timestamp) — not prompts or full command output. Opening 자세히 보기 (Inspect) on a specific call, or a turn divider's excerpt, reveals more (the full input, and the result once available) — by design, since that's the point of drilling in, but worth knowing if your transcripts contain sensitive data.
 - Everything stays on your machine; the plugin makes no network requests.
 - Transcript formats are unofficial: unknown records are skipped defensively, and agent updates may require a parser refresh.
 
