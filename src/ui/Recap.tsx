@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink'
 import type { StatsStore } from '../stats.js'
 import { computeRecap } from '../recap.js'
-import { padDisplay } from './format.js'
+import { displayWidth, padDisplay } from './format.js'
 
 interface Props {
   readonly stats: StatsStore
@@ -17,22 +17,22 @@ export function Recap({ stats, width, height, now }: Props) {
   if (recap.totalCalls === 0) {
     return (
       <Box height={height} justifyContent="center" alignItems="center">
-        <Text dimColor>오늘은 아직 조용하네요 — tool 호출이 없습니다</Text>
+        <Text dimColor>No tool calls yet today</Text>
       </Box>
     )
   }
 
-  const titleWidth = Math.max(...recap.badges.map((badge) => [...badge.title].length * 2), 0) + 2
+  const titleWidth = Math.max(...recap.badges.map((badge) => displayWidth(badge.title)), 0) + 2
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1} height={height} overflow="hidden">
       <Text bold>
-        🌙 오늘의 리캡 <Text dimColor>· {date}</Text>
+        🌙 Today's recap <Text dimColor>· {date}</Text>
       </Text>
       <Text dimColor>{'─'.repeat(Math.max(Math.min(width - 6, 46), 1))}</Text>
       <Text>
-        총 <Text bold color="yellowBright">{recap.totalCalls.toLocaleString()}</Text> tool calls
+        Total <Text bold color="yellowBright">{recap.totalCalls.toLocaleString('en-US')}</Text> tool calls
         <Text dimColor>
-          {' '}· agent {recap.activeAgents}명 · 활동 범위 {recap.spanLabel}
+          {' '}· {recap.activeAgents} agents · activity span {recap.spanLabel}
         </Text>
       </Text>
       <Box height={1} />

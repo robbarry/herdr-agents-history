@@ -25,6 +25,12 @@ function group(event: ToolEvent, count = 1): FeedGroup {
 const NOW = new Date('2026-07-17T13:00:00Z')
 
 describe('computeInspectLayout', () => {
+  it('uses an English prompt heading without translating transcript content', () => {
+    const event = toolEvent({ kind: 'turn', tool: '', raw: '다음 작업', detail: '다음 작업' })
+    const layout = computeInspectLayout(group(event), [], 80, 30, NOW)
+    expect(layout.bodyLines.map((line) => line.text)).toEqual(['full prompt:', '다음 작업'])
+  })
+
   it('wraps input to the content width and fits without an indicator when it fits', () => {
     const event = toolEvent({ raw: 'a short input' })
     const layout = computeInspectLayout(group(event), [], 80, 30, NOW)

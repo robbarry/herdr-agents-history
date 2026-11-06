@@ -38,7 +38,7 @@ export function Inspect({ group, constituents, agent, output, scrollOffset, widt
   if (!group) {
     return (
       <Box height={height} justifyContent="center" alignItems="center">
-        <Text dimColor>이 호출은 버퍼에서 제거되었습니다 — [Esc] 돌아가기</Text>
+        <Text dimColor>This call is no longer in the buffer — [Esc] back</Text>
       </Box>
     )
   }
@@ -71,8 +71,8 @@ export function Inspect({ group, constituents, agent, output, scrollOffset, widt
   const rows: ReactNode[] = []
   rows.push(
     <Text bold wrap="truncate" key="title">
-      {isTurn ? '❯ 대화 턴' : `${style.icon} ${event.tool}`}
-      <Text dimColor> · 자세히 보기</Text>
+      {isTurn ? '❯ Conversation turn' : `${style.icon} ${event.tool}`}
+      <Text dimColor> · inspect</Text>
     </Text>
   )
   rows.push(<Box key="divider-top">{divider}</Box>)
@@ -111,7 +111,7 @@ export function Inspect({ group, constituents, agent, output, scrollOffset, widt
     rows.push(<Box key="divider-constituents">{divider}</Box>)
     rows.push(
       <Text dimColor wrap="truncate" key="constituents-label">
-        연속 호출 {count}회:
+        Consecutive calls: {count}
       </Text>
     )
     constituentPreviews.forEach((preview) => {
@@ -127,7 +127,7 @@ export function Inspect({ group, constituents, agent, output, scrollOffset, widt
     if (constituentOverflow > 0) {
       rows.push(
         <Text dimColor wrap="truncate" key="constituents-overflow">
-          {'  '}… 외 {constituentOverflow}회
+          {'  '}… {constituentOverflow} more calls
         </Text>
       )
     }
@@ -159,7 +159,7 @@ export function Inspect({ group, constituents, agent, output, scrollOffset, widt
       {moreBelow > 0 ? (
         <Text dimColor>
           {' '}
-          ↓ {moreBelow}줄 더 <Text color="cyan">· [j/k] 스크롤 [g/G] 처음/끝</Text>
+          ↓ {moreBelow} more lines <Text color="cyan">· [j/k] scroll [g/G] top/bottom</Text>
         </Text>
       ) : null}
     </Box>

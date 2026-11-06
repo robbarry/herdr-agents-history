@@ -29,7 +29,7 @@ export function Board({ agents, stats, selected, width, height, now }: Props) {
   if (agents.length === 0) {
     return (
       <Box height={height} justifyContent="center" alignItems="center">
-        <Text dimColor>추적 중인 agent가 없습니다</Text>
+        <Text dimColor>No agents being tracked</Text>
       </Box>
     )
   }
@@ -95,7 +95,7 @@ export function Board({ agents, stats, selected, width, height, now }: Props) {
               <Text dimColor wrap="truncate">
                 {last && lastStyle
                   ? `▸ ${lastStyle.icon} ${formatDetail(last.detail, agent.cwd, innerWidth - 5)}`
-                  : '▸ 아직 tool 호출 없음'}
+                  : '▸ No tool calls yet'}
               </Text>
             </Box>
           )

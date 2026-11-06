@@ -43,11 +43,11 @@ describe('computeRecap', () => {
     expect(recap.activeAgents).toBe(2)
 
     const byTitle = new Map(recap.badges.map((badge) => [badge.title, badge.description]))
-    expect(byTitle.get('오늘의 일꾼')).toContain('busy-app')
-    expect(byTitle.get('오늘의 일꾼')).toContain('7 calls')
-    expect(byTitle.get('최장 콤보')).toContain('Bash ×4')
-    expect(byTitle.get('다독왕')).toContain('reader-app')
-    expect(byTitle.get('조용한 하루')).toContain('quiet-app')
+    expect(byTitle.get('Busiest agent')).toContain('busy-app')
+    expect(byTitle.get('Busiest agent')).toContain('7 calls')
+    expect(byTitle.get('Longest streak')).toContain('Bash ×4 in a row')
+    expect(byTitle.get('Most reads')).toContain('reader-app')
+    expect(byTitle.get('Quiet day')).toContain('quiet-app')
   })
 
   it('handles an empty day without badges', () => {
