@@ -12,7 +12,7 @@ export interface ConstituentPreview {
 
 export interface BodyLine {
   readonly text: string
-  /** section headings ("input:", "output:", "prompt 전문:") get distinct styling */
+  /** section headings ("input:", "output:", "full prompt:") get distinct styling */
   readonly isLabel: boolean
 }
 
@@ -83,7 +83,7 @@ export function computeInspectLayout(
       time: formatTime(item.ts, now),
       lines: wrapText(item.detail || '(no detail)', constituentWidth)
     }))
-    headerLines += 2 // divider + "연속 호출 N회:" label
+    headerLines += 2 // divider + "Consecutive calls: N" label
     headerLines += constituentPreviews.reduce((sum, p) => sum + p.lines.length, 0)
     if (constituentOverflow > 0) headerLines += 1
   }
@@ -91,7 +91,7 @@ export function computeInspectLayout(
   // input and output share one region, each introduced by its own label line
   const bodyLines: BodyLine[] = []
   if (event.raw) {
-    bodyLines.push({ text: isTurn ? 'prompt 전문:' : 'input:', isLabel: true })
+    bodyLines.push({ text: isTurn ? 'full prompt:' : 'input:', isLabel: true })
     bodyLines.push(...textLines(wrapText(event.raw, contentWidth)))
   }
   if (output && output.length > 0) {

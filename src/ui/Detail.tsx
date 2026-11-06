@@ -20,7 +20,7 @@ export function Detail({ agent, agentKey, stats, scrollOffset, width, height, no
   if (!agentStats) {
     return (
       <Box height={height} justifyContent="center" alignItems="center">
-        <Text dimColor>이 agent의 기록이 없습니다</Text>
+        <Text dimColor>No history for this agent</Text>
       </Box>
     )
   }
@@ -50,16 +50,16 @@ export function Detail({ agent, agentKey, stats, scrollOffset, width, height, no
         </Text>
         <Text dimColor>
           {' '}· {agentStats.kind} · {agentStats.total} calls
-          {agent ? ` · ${STATUS_ICON[agent.status] ?? '?'} ${agent.status}` : ' · (종료됨)'}
+          {agent ? ` · ${STATUS_ICON[agent.status] ?? '?'} ${agent.status}` : ' · (exited)'}
         </Text>
       </Text>
       <Text>
-        <Text dimColor>활동(최근 1h) </Text>
+        <Text dimColor>Activity (last 1h) </Text>
         <Text color={agentColor(agentKey)}>{spark}</Text>
-        <Text dimColor>{agentStats.firstTs ? `  시작 ${formatTime(agentStats.firstTs, now).trim()}` : ''}</Text>
+        <Text dimColor>{agentStats.firstTs ? `  started ${formatTime(agentStats.firstTs, now).trim()}` : ''}</Text>
       </Text>
-      <Text dimColor wrap="truncate">도구 분포     {distribution || '—'}</Text>
-      <Text dimColor wrap="truncate">파일 Top      {files || '—'}</Text>
+      <Text dimColor wrap="truncate">Tool usage    {distribution || '—'}</Text>
+      <Text dimColor wrap="truncate">Top files     {files || '—'}</Text>
       <Text dimColor>{'─'.repeat(Math.max(width - 2, 1))}</Text>
       {visible.map((event) => {
         const style = toolStyle(event.tool)
@@ -79,7 +79,7 @@ export function Detail({ agent, agentKey, stats, scrollOffset, width, height, no
           </Box>
         )
       })}
-      {scrollOffset > 0 ? <Text dimColor>  ↓ {scrollOffset}개 더 (최신)</Text> : null}
+      {scrollOffset > 0 ? <Text dimColor>  ↓ {scrollOffset} newer entries below</Text> : null}
     </Box>
   )
 }

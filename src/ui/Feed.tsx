@@ -33,7 +33,7 @@ export function Feed({ groups, bottomIndex, focusIndex, agents, height, width, p
   if (groups.length === 0) {
     return (
       <Box flexDirection="column" paddingX={1} height={height} justifyContent="center" alignItems="center">
-        <Text dimColor>agent들의 tool 호출을 기다리는 중…</Text>
+        <Text dimColor>Waiting for agent tool calls…</Text>
       </Box>
     )
   }
@@ -124,7 +124,7 @@ export function Feed({ groups, bottomIndex, focusIndex, agents, height, width, p
       </Box>
       {showIndicator ? (
         <Text color="cyan">
-          {'  '}↓ {newerCount}개 더 아래 <Text dimColor>· [Enter] 자세히 [j/k] 이동 [G] 최신 따라가기</Text>
+          {'  '}↓ {newerCount} more below <Text dimColor>· [Enter] inspect [j/k] move [G] follow latest</Text>
         </Text>
       ) : null}
     </Box>

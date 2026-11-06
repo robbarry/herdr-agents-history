@@ -1,11 +1,11 @@
 import { Box, Text } from 'ink'
 
 const HINTS: Readonly<Record<string, string>> = {
-  feed: '[Tab] board  [r] recap  [↑↓] 포커스  [Enter] 자세히  [/] filter  [p] pause  [q] quit',
-  board: '[Tab] feed  [←→↑↓/hjkl] 이동  [Enter] 상세  [r] recap  [q] quit',
-  detail: '[j/k] scroll  [g/G] 처음/끝  [Esc] board  [q] quit',
-  recap: '[Esc/r] 돌아가기  [q] quit',
-  inspect: '[j/k] scroll  [g/G] 처음/끝  [Esc/Enter] 돌아가기  [q] quit'
+  feed: '[Tab] board  [r] recap  [↑↓] select  [Enter] inspect  [/] filter  [p] pause  [q] quit',
+  board: '[Tab] feed  [←→↑↓/hjkl] move  [Enter] detail  [r] recap  [q] quit',
+  detail: '[j/k] scroll  [g/G] top/bottom  [Esc] board  [q] quit',
+  recap: '[Esc/r] back  [q] quit',
+  inspect: '[j/k] scroll  [g/G] top/bottom  [Esc/Enter] back  [q] quit'
 }
 
 interface Props {

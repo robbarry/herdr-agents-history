@@ -88,29 +88,29 @@ export function computeRecap(stats: StatsStore, now: Date): Recap {
 
   const badges: RecapBadge[] = []
   const worker = topBy(active, (agent) => agent.events.length)
-  if (worker) badges.push({ icon: '🏆', title: '오늘의 일꾼', description: `${worker.agent.label} (${worker.value} calls)` })
+  if (worker) badges.push({ icon: '🏆', title: 'Busiest agent', description: `${worker.agent.label} (${worker.value} calls)` })
 
   const streak = longestStreak(active)
   if (streak) {
     const hhmm = streak.at.toTimeString().slice(0, 5)
-    badges.push({ icon: '🔥', title: '최장 콤보', description: `${streak.tool} ×${streak.count} 연속 (${streak.agent.label}, ${hhmm})` })
+    badges.push({ icon: '🔥', title: 'Longest streak', description: `${streak.tool} ×${streak.count} in a row (${streak.agent.label}, ${hhmm})` })
   }
 
   const badgeRules: Array<readonly [RegExp, string, string]> = [
-    [BASH_TOOLS, '🔨', '터미널 장인'],
-    [READ_TOOLS, '📚', '다독왕'],
-    [WRITE_TOOLS, '📜', '저술가'],
-    [WEB_TOOLS, '🌐', '바깥 구경'],
-    [DELEGATE_TOOLS, '🤖', '위임의 달인']
+    [BASH_TOOLS, '🔨', 'Terminal expert'],
+    [READ_TOOLS, '📚', 'Most reads'],
+    [WRITE_TOOLS, '📜', 'Most writes'],
+    [WEB_TOOLS, '🌐', 'Web explorer'],
+    [DELEGATE_TOOLS, '🤖', 'Top delegator']
   ]
   badgeRules.forEach(([pattern, icon, title]) => {
     const top = topBy(active, (agent) => countMatching(agent, pattern))
-    if (top) badges.push({ icon, title, description: `${top.agent.label} (${top.value}회)` })
+    if (top) badges.push({ icon, title, description: `${top.agent.label} (${top.value} calls)` })
   })
 
   const quiet = agents.filter((agent) => agent.events.length === 0)
   if (quiet.length > 0 && active.length > 0) {
-    badges.push({ icon: '🤫', title: '조용한 하루', description: quiet.map((agent) => agent.label).join(', ') })
+    badges.push({ icon: '🤫', title: 'Quiet day', description: quiet.map((agent) => agent.label).join(', ') })
   }
 
   return { totalCalls, activeAgents: active.length, spanLabel, badges }
